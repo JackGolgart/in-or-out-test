@@ -1,16 +1,23 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
 
 export default function Home() {
   const [players, setPlayers] = useState([]);
   const [search, setSearch] = useState('');
   const [filtered, setFiltered] = useState([]);
-  const [userId, setUserId] = useState(null);
 
   useEffect(() => {
-    fetch('https://www.balldontlie.io/api/v1/players?per_page=100')
-      .then(res => res.json())
-      .then(data => setPlayers(data.data));
+    async function getPlayers() {
+      try {
+        const res = await fetch('https://www.balldontlie.io/api/v1/players?per_page=100');
+        if (!res.ok) throw new Error("Fetch failed with status " + res.status);
+        const data = await res.json();
+        setPlayers(data.data);
+      } catch (err) {
+        console.error("API fetch failed:", err);
+      }
+    }
+
+    getPlayers();
   }, []);
 
   useEffect(() => {
@@ -18,29 +25,6 @@ export default function Home() {
       (p.first_name + ' ' + p.last_name).toLowerCase().includes(search.toLowerCase())
     ));
   }, [search, players]);
-
-  async function makePick(player, selection) {
-    if (!userId) {
-      alert("You must be logged in to make a pick.");
-      return;
-    }
-
-    const { error } = await supabase.from('picks').insert([
-      {
-        user_id: userId,
-        player_id: player.id,
-        player_name: player.first_name + ' ' + player.last_name,
-        selection: selection
-      }
-    ]);
-
-    if (error) {
-      console.error("Failed to save pick:", error);
-      alert("Error saving pick.");
-    } else {
-      alert(`You are now ${selection} on ${player.first_name} ${player.last_name}`);
-    }
-  }
 
   return (
     <div style={{ backgroundColor: '#0b0f1a', minHeight: '100vh', color: '#fff', padding: '2rem' }}>
@@ -59,8 +43,8 @@ export default function Home() {
             <span style={{ marginRight: '1rem', fontWeight: 'bold' }}>
               #{player.id} - {player.first_name} {player.last_name}
             </span>
-            <button style={{ marginRight: '0.5rem' }} onClick={() => makePick(player, 'IN')}>🔥 IN</button>
-            <button onClick={() => makePick(player, 'OUT')}>❄️ OUT</button>
+            <button style={{ marginRight: '0.5rem' }}>🔥 IN</button>
+            <button>❄️ OUT</button>
           </li>
         ))}
       </ul>
