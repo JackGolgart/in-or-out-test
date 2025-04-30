@@ -1,0 +1,68 @@
+{
+  "tables": [
+    {
+      "name": "users",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "primary_key": true
+        },
+        {
+          "name": "username",
+          "type": "text",
+          "unique": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "default": "now()"
+        }
+      ]
+    },
+    {
+      "name": "picks",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "primary_key": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "references": "users(id)"
+        },
+        {
+          "name": "player_id",
+          "type": "int"
+        },
+        {
+          "name": "player_name",
+          "type": "text"
+        },
+        {
+          "name": "nickname",
+          "type": "text"
+        },
+        {
+          "name": "selection",
+          "type": "text"
+        },
+        {
+          "name": "selection_date",
+          "type": "timestamp",
+          "default": "now()"
+        },
+        {
+          "name": "initial_per",
+          "type": "float"
+        },
+        {
+          "name": "career_per",
+          "type": "float"
+        }
+      ]
+    }
+  ]
+}
