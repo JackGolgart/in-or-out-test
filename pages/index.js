@@ -1,10 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BalldontlieAPI } from '@balldontlie/sdk';
 import { supabase } from '../lib/supabase';
-
-const api = new BalldontlieAPI({
-  apiKey: 'c81d57c3-85f8-40f2-ad5b-0c268c0220a0'
-});
 
 export default function Home() {
   const [players, setPlayers] = useState([]);
@@ -23,16 +18,12 @@ export default function Home() {
   useEffect(() => {
     const fetchPlayers = async () => {
       try {
-        if (!api.players || typeof api.players.getAll !== 'function') {
-          console.error("BallDon'tLie SDK not initialized correctly.");
-          return;
-        }
-
-        const response = await api.players.getAll({ perPage: 100 });
-        console.log("Loaded players:", response.data);
-        setPlayers(response.data);
+        const res = await fetch("https://www.balldontlie.io/api/v1/players?per_page=100");
+        const data = await res.json();
+        console.log("Loaded players via fetch:", data.data);
+        setPlayers(data.data);
       } catch (err) {
-        console.error("SDK fetch failed:", err);
+        console.error("Direct fetch failed:", err);
       }
     };
     fetchPlayers();
@@ -52,7 +43,6 @@ export default function Home() {
 
     try {
       const per = Math.random() * 25 + 5;
-
       const { error } = await supabase.from('picks').insert([
         {
           user_id: userId,
@@ -63,9 +53,7 @@ export default function Home() {
           career_per: per - Math.random() * 3
         }
       ]);
-
       if (error) throw error;
-
       alert(`You are now ${selection} on ${player.first_name} ${player.last_name}`);
     } catch (err) {
       console.error("Failed to save pick:", err);
