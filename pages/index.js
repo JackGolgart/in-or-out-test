@@ -1,4 +1,9 @@
 import { useEffect, useState } from 'react';
+import { BalldontlieAPI } from '@balldontlie/sdk';
+
+const api = new BalldontlieAPI({
+  apiKey: 'c81d57c3-85f8-40f2-ad5b-0c268c0220a0'
+});
 
 export default function Home() {
   const [players, setPlayers] = useState([]);
@@ -6,18 +11,15 @@ export default function Home() {
   const [filtered, setFiltered] = useState([]);
 
   useEffect(() => {
-    async function getPlayers() {
+    async function fetchPlayers() {
       try {
-        const res = await fetch('https://www.balldontlie.io/api/v1/players?per_page=100');
-        if (!res.ok) throw new Error("Fetch failed with status " + res.status);
-        const data = await res.json();
-        setPlayers(data.data);
+        const response = await api.players.getAll({ perPage: 100 });
+        setPlayers(response.data);
       } catch (err) {
-        console.error("API fetch failed:", err);
+        console.error("SDK fetch failed:", err);
       }
     }
-
-    getPlayers();
+    fetchPlayers();
   }, []);
 
   useEffect(() => {
