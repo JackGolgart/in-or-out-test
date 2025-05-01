@@ -5,7 +5,6 @@ import { supabase } from '../lib/supabase';
 export default function Home() {
   const [players, setPlayers] = useState([]);
   const [search, setSearch] = useState('');
-  const [filtered, setFiltered] = useState([]);
   const [userId, setUserId] = useState(null);
 
   useEffect(() => {
@@ -16,27 +15,14 @@ export default function Home() {
     getUser();
   }, []);
 
-  useEffect(() => {
-    fetchPlayers();
-  }, []);
-
-  const fetchPlayers = async () => {
+  const handleSearch = async () => {
     try {
-      const res = await fetch("/api/players");
+      const res = await fetch(`/api/players?search=${encodeURIComponent(search)}`);
       const json = await res.json();
-      const all = Array.isArray(json.data) ? json.data : [];
-      setPlayers(all);
-      setFiltered(all);
+      setPlayers(Array.isArray(json.data) ? json.data : []);
     } catch (err) {
-      console.error("Failed to fetch players via proxy:", err);
+      console.error("Search error:", err);
     }
-  };
-
-  const handleSearch = () => {
-    const result = players.filter(p =>
-      (p.first_name + ' ' + p.last_name).toLowerCase().includes(search.toLowerCase())
-    );
-    setFiltered(result);
   };
 
   return (
@@ -52,11 +38,11 @@ export default function Home() {
       <button onClick={handleSearch} style={{ marginLeft: '1rem', padding: '0.5rem 1rem' }}>Search</button>
 
       <div style={{ marginTop: '2rem' }}>
-        {filtered.length === 0 ? (
+        {players.length === 0 ? (
           <p>No players found.</p>
         ) : (
           <ul>
-            {filtered.map(player => (
+            {players.map(player => (
               <li key={player.id} style={{ marginBottom: '1rem' }}>
                 <Link href={`/player/${player.id}`} style={{ color: '#6cf', marginRight: '1rem' }}>
                   {player.first_name} {player.last_name}
