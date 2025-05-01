@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { supabase } from '../lib/supabase';
 
 export default function Home() {
@@ -16,48 +17,23 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const fetchPlayers = async () => {
-      try {
-        const res = await fetch("/api/players");
-        const data = await res.json();
-        console.log("Fetched via API route:", data.data);
-        setPlayers(data.data);
-      } catch (err) {
-        console.error("Failed to fetch players via proxy:", err);
-      }
-    };
     fetchPlayers();
   }, []);
 
-  useEffect(() => {
+  const fetchPlayers = async () => {
+    try {
+      const res = await fetch("/api/players");
+      const json = await res.json();
+      setPlayers(Array.isArray(json.data) ? json.data : []);
+    } catch (err) {
+      console.error("Failed to fetch players via proxy:", err);
+    }
+  };
+
+  const handleSearch = () => {
     setFiltered(players.filter(p =>
       (p.first_name + ' ' + p.last_name).toLowerCase().includes(search.toLowerCase())
     ));
-  }, [search, players]);
-
-  const makePick = async (player, selection) => {
-    if (!userId) {
-      alert("You must be logged in to make picks.");
-      return;
-    }
-
-    try {
-      const per = Math.random() * 25 + 5;
-      const { error } = await supabase.from('picks').insert([
-        {
-          user_id: userId,
-          player_id: player.id,
-          player_name: player.first_name + ' ' + player.last_name,
-          selection,
-          initial_per: per,
-          career_per: per - Math.random() * 3
-        }
-      ]);
-      if (error) throw error;
-      alert(`You are now ${selection} on ${player.first_name} ${player.last_name}`);
-    } catch (err) {
-      console.error("Failed to save pick:", err);
-    }
   };
 
   return (
@@ -68,16 +44,15 @@ export default function Home() {
         value={search}
         onChange={e => setSearch(e.target.value)}
         placeholder="Search NBA player..."
-        style={{ padding: '0.5rem', fontSize: '1rem', width: '300px', marginRight: '1rem' }}
+        style={{ padding: '0.5rem', fontSize: '1rem', width: '300px' }}
       />
+      <button onClick={handleSearch} style={{ marginLeft: '1rem', padding: '0.5rem 1rem' }}>Search</button>
       <ul style={{ marginTop: '2rem' }}>
         {filtered.map(player => (
           <li key={player.id} style={{ marginBottom: '1rem' }}>
-            <span style={{ marginRight: '1rem', fontWeight: 'bold' }}>
-              #{player.id} - {player.first_name} {player.last_name}
-            </span>
-            <button onClick={() => makePick(player, 'IN')} style={{ marginRight: '0.5rem' }}>🔥 IN</button>
-            <button onClick={() => makePick(player, 'OUT')}>❄️ OUT</button>
+            <Link href={`/player/${player.id}`} style={{ color: '#6cf', marginRight: '1rem' }}>
+              {player.first_name} {player.last_name}
+            </Link>
           </li>
         ))}
       </ul>
