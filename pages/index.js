@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BalldontlieAPI } from '@balldontlie/sdk';
+import { supabase } from '../lib/supabase';
 
 const api = new BalldontlieAPI({
   apiKey: 'c81d57c3-85f8-40f2-ad5b-0c268c0220a0'
@@ -9,6 +10,15 @@ export default function Home() {
   const [players, setPlayers] = useState([]);
   const [search, setSearch] = useState('');
   const [filtered, setFiltered] = useState([]);
+  const [userId, setUserId] = useState(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) setUserId(session.user.id);
+    };
+    getUser();
+  }, []);
 
   useEffect(() => {
     async function fetchPlayers() {
@@ -28,6 +38,34 @@ export default function Home() {
     ));
   }, [search, players]);
 
+  const makePick = async (player, selection) => {
+    if (!userId) {
+      alert("You must be logged in to make picks.");
+      return;
+    }
+
+    try {
+      const per = Math.random() * 25 + 5; // Placeholder PER
+
+      const { error } = await supabase.from('picks').insert([
+        {
+          user_id: userId,
+          player_id: player.id,
+          player_name: player.first_name + ' ' + player.last_name,
+          selection,
+          initial_per: per,
+          career_per: per - Math.random() * 3
+        }
+      ]);
+
+      if (error) throw error;
+
+      alert(`You are now ${selection} on ${player.first_name} ${player.last_name}`);
+    } catch (err) {
+      console.error("Failed to save pick:", err);
+    }
+  };
+
   return (
     <div style={{ backgroundColor: '#0b0f1a', minHeight: '100vh', color: '#fff', padding: '2rem' }}>
       <h1 style={{ fontSize: '2rem' }}>In or Out?</h1>
@@ -38,15 +76,14 @@ export default function Home() {
         placeholder="Search NBA player..."
         style={{ padding: '0.5rem', fontSize: '1rem', width: '300px', marginRight: '1rem' }}
       />
-      <button onClick={() => {}} style={{ padding: '0.5rem 1rem' }}>Search</button>
       <ul style={{ marginTop: '2rem' }}>
         {filtered.map(player => (
           <li key={player.id} style={{ marginBottom: '1rem' }}>
             <span style={{ marginRight: '1rem', fontWeight: 'bold' }}>
               #{player.id} - {player.first_name} {player.last_name}
             </span>
-            <button style={{ marginRight: '0.5rem' }}>🔥 IN</button>
-            <button>❄️ OUT</button>
+            <button onClick={() => makePick(player, 'IN')} style={{ marginRight: '0.5rem' }}>🔥 IN</button>
+            <button onClick={() => makePick(player, 'OUT')}>❄️ OUT</button>
           </li>
         ))}
       </ul>
