@@ -23,6 +23,11 @@ export default function Home() {
   useEffect(() => {
     const fetchPlayers = async () => {
       try {
+        if (!api.players || typeof api.players.getAll !== 'function') {
+          console.error("BallDon'tLie SDK not initialized correctly.");
+          return;
+        }
+
         const response = await api.players.getAll({ perPage: 100 });
         console.log("Loaded players:", response.data);
         setPlayers(response.data);
