@@ -18,12 +18,12 @@ export default function Home() {
   useEffect(() => {
     const fetchPlayers = async () => {
       try {
-        const res = await fetch("https://www.balldontlie.io/api/v1/players?per_page=100");
+        const res = await fetch("/api/players");
         const data = await res.json();
-        console.log("Loaded players via fetch:", data.data);
+        console.log("Fetched via API route:", data.data);
         setPlayers(data.data);
       } catch (err) {
-        console.error("Direct fetch failed:", err);
+        console.error("Failed to fetch players via proxy:", err);
       }
     };
     fetchPlayers();
