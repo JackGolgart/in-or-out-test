@@ -21,14 +21,15 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    async function fetchPlayers() {
+    const fetchPlayers = async () => {
       try {
         const response = await api.players.getAll({ perPage: 100 });
+        console.log("Loaded players:", response.data);
         setPlayers(response.data);
       } catch (err) {
         console.error("SDK fetch failed:", err);
       }
-    }
+    };
     fetchPlayers();
   }, []);
 
@@ -45,7 +46,7 @@ export default function Home() {
     }
 
     try {
-      const per = Math.random() * 25 + 5; // Placeholder PER
+      const per = Math.random() * 25 + 5;
 
       const { error } = await supabase.from('picks').insert([
         {
