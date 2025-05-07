@@ -1,80 +1,167 @@
-import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabase';
 
-export default function PlayerDetail() {
+export default function PlayerPage() {
   const router = useRouter();
   const { id } = router.query;
   const [player, setPlayer] = useState(null);
+  const [userPick, setUserPick] = useState(null);
   const [userId, setUserId] = useState(null);
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) setUserId(session.user.id);
-    };
-    getUser();
-  }, []);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [toast, setToast] = useState('');
 
   useEffect(() => {
     if (!id) return;
-    const fetchPlayer = async () => {
-      try {
-        const res = await fetch(`/api/player/${id}`);
-        const data = await res.json();
-        setPlayer(data);
-      } catch (err) {
-        console.error("Error loading player detail:", err);
+
+    const fetchData = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setError('Please log in to make a pick.');
+        setLoading(false);
+        return;
       }
+
+      const uid = session.user.id;
+      setUserId(uid);
+
+      const { data: playerData, error: playerErr } = await supabase
+        .from('players')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (playerErr) {
+        setError('Player not found.');
+        setLoading(false);
+        return;
+      }
+
+      setPlayer(playerData);
+
+      const { data: pickData } = await supabase
+        .from('user_picks')
+        .select('*')
+        .eq('player_id', id)
+        .eq('user_id', uid)
+        .maybeSingle();
+
+      if (pickData) setUserPick(pickData);
+
+      setLoading(false);
     };
-    fetchPlayer();
+
+    fetchData();
   }, [id]);
 
-  const makePick = async (selection) => {
-    if (!userId || !player) {
-      alert("Must be logged in.");
-      return;
-    }
+  useEffect(() => {
+    if (!userId || !id) return;
 
-    try {
-      const per = Math.random() * 25 + 5;
-      const { error } = await supabase.from('picks').insert([
+    const subscription = supabase
+      .channel('player-pick')
+      .on(
+        'postgres_changes',
         {
-          user_id: userId,
-          player_id: player.id,
-          player_name: player.first_name + ' ' + player.last_name,
-          selection,
-          initial_per: per,
-          career_per: per - Math.random() * 3
+          event: '*',
+          schema: 'public',
+          table: 'user_picks',
+          filter: `user_id=eq.${userId},player_id=eq.${id}`,
+        },
+        async () => {
+          const { data } = await supabase
+            .from('user_picks')
+            .select('*')
+            .eq('player_id', id)
+            .eq('user_id', userId)
+            .maybeSingle();
+
+          if (data) setUserPick(data);
         }
-      ]);
-      if (error) throw error;
-      alert(`Marked ${selection} on ${player.first_name} ${player.last_name}`);
-    } catch (err) {
-      console.error("Error saving pick:", err);
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [userId, id]);
+
+  const handlePick = async (selection) => {
+    setError('');
+    const res = await fetch('/api/pick', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        playerId: player.id,
+        playerName: `${player.first_name} ${player.last_name}`,
+        selection,
+      }),
+    });
+
+    const result = await res.json();
+    if (result.success) {
+      setToast(`You selected ${selection.toUpperCase()}!`);
+      setTimeout(() => setToast(''), 3000);
+    } else {
+      setError(result.error || 'Failed to save your pick.');
     }
   };
 
-  if (!player) return <div style={{ padding: '2rem', color: 'white' }}>Loading player details...</div>;
+  if (loading) return <div className="text-white p-8">Loading...</div>;
+  if (error) return <div className="text-red-500 p-8">{error}</div>;
+
+  const perChange = player && userPick
+    ? (player.current_per - userPick.locked_in_per).toFixed(2)
+    : null;
+
+  const trend = perChange > 0
+    ? { icon: '📈', color: 'text-green-400' }
+    : perChange < 0
+    ? { icon: '📉', color: 'text-red-400' }
+    : { icon: '➖', color: 'text-gray-300' };
 
   return (
-    <div style={{ backgroundColor: '#0b0f1a', minHeight: '100vh', color: '#fff', padding: '2rem' }}>
-      <img
-        src={`https://cdn.nba.com/headshots/nba/latest/260x190/${player.id}.png`}
-        alt="Player"
-        onError={(e) => { e.target.style.display = 'none'; }}
-        style={{ width: 120, borderRadius: 8, marginBottom: '1rem' }}
-      />
-      <h1>{player.first_name} {player.last_name}</h1>
-      <p><strong>Position:</strong> {player.position || 'N/A'}</p>
-      <p><strong>Team:</strong> {player.team?.full_name}</p>
-      <p><strong>Abbreviation:</strong> {player.team?.abbreviation}</p>
-      <p><strong>PER (mock):</strong> {Math.round(Math.random() * 15 + 10)}</p>
-      <div style={{ marginTop: '1rem' }}>
-        <button onClick={() => makePick('IN')} style={{ marginRight: '1rem' }}>🔥 IN</button>
-        <button onClick={() => makePick('OUT')}>❄️ OUT</button>
-      </div>
-      <button onClick={() => router.back()} style={{ marginTop: '2rem' }}>← Back</button>
+    <div className="relative min-h-screen bg-gray-900 text-white p-8">
+      {toast && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-green-600 px-4 py-2 rounded shadow-lg text-white transition-opacity duration-500">
+          {toast}
+        </div>
+      )}
+
+      <h1 className="text-3xl font-bold mb-4">
+        {player.first_name} {player.last_name}
+      </h1>
+      <p className="mb-2">Team: {player.team}</p>
+      <p className="mb-2">Position: {player.position}</p>
+      <p className="mb-6">Current PER: {player.current_per}</p>
+
+      {userPick ? (
+        <div className="bg-gray-800 p-4 rounded-md mt-4">
+          <p className="text-green-400 font-semibold mb-2">
+            You picked: {userPick.selection.toUpperCase()}
+          </p>
+          <p>PER at time of pick: {userPick.locked_in_per}</p>
+          <p className={`${trend.color} flex items-center gap-2`}>
+            {trend.icon} {perChange >= 0 ? '+' : ''}{perChange} PER since your pick
+          </p>
+        </div>
+      ) : (
+        <div className="space-x-4 mt-4">
+          <button
+            onClick={() => handlePick('in')}
+            className="px-6 py-2 bg-green-600 hover:bg-green-700 rounded-md"
+          >
+            IN
+          </button>
+          <button
+            onClick={() => handlePick('out')}
+            className="px-6 py-2 bg-red-600 hover:bg-red-700 rounded-md"
+          >
+            OUT
+          </button>
+        </div>
+      )}
     </div>
   );
 }
+
