@@ -1,9 +1,9 @@
-// pages/index.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 import { supabase } from '../lib/supabase';
+import Layout from '../components/Layout';
 
 export default function Home() {
   const [query, setQuery] = useState('');
@@ -21,21 +21,23 @@ export default function Home() {
     fetch('https://www.balldontlie.io/api/v1/teams')
       .then(res => res.json())
       .then(data => setTeams(data.data))
-      .catch(err => console.error(err));
+      .catch(console.error);
   }, []);
 
-  useEffect(() => {
-    const delay = setTimeout(() => {
-      let url = 'https://www.balldontlie.io/api/v1/players?per_page=100';
-      if (query.length > 2) url += `&search=${query}`;
-      if (selectedTeam) url += `&team_ids[]=${selectedTeam}`;
-      if (selectedPosition) url += `&positions[]=${selectedPosition}`;
+  const fetchPlayers = () => {
+    let url = 'https://www.balldontlie.io/api/v1/players?per_page=100';
+    if (query.length > 2) url += `&search=${query}`;
+    if (selectedTeam) url += `&team_ids[]=${selectedTeam}`;
+    if (selectedPosition) url += `&positions[]=${selectedPosition}`;
 
-      fetch(url)
-        .then(res => res.json())
-        .then(data => setPlayers(data.data))
-        .catch(() => setPlayers([]));
-    }, 400);
+    fetch(url)
+      .then(res => res.json())
+      .then(data => setPlayers(data.data))
+      .catch(() => setPlayers([]));
+  };
+
+  useEffect(() => {
+    const delay = setTimeout(fetchPlayers, 400);
     return () => clearTimeout(delay);
   }, [query, selectedTeam, selectedPosition]);
 
@@ -53,13 +55,13 @@ export default function Home() {
     };
 
     const now = new Date();
-    const past24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-    const past7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const past24h = new Date(now - 864e5).toISOString();
+    const past7d = new Date(now - 7 * 864e5).toISOString();
 
-    fetchTopPicks('in', past24Hours, setTopIns24h);
-    fetchTopPicks('out', past24Hours, setTopOuts24h);
-    fetchTopPicks('in', past7Days, setTopIns7d);
-    fetchTopPicks('out', past7Days, setTopOuts7d);
+    fetchTopPicks('in', past24h, setTopIns24h);
+    fetchTopPicks('out', past24h, setTopOuts24h);
+    fetchTopPicks('in', past7d, setTopIns7d);
+    fetchTopPicks('out', past7d, setTopOuts7d);
   }, []);
 
   const renderPlayerCard = (playerId) => {
@@ -80,15 +82,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <nav className="bg-gray-800 p-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-purple-300">🏀 InOrOut</h1>
-        <div className="space-x-4">
-          <a href="/" className="hover:text-purple-400">Home</a>
-          <a href="/portfolio" className="hover:text-purple-400">Portfolio</a>
-        </div>
-      </nav>
-
+    <Layout>
       <section className="text-center py-10 px-4">
         <h2 className="text-4xl font-extrabold mb-4">Pick Your Players</h2>
         <p className="text-gray-400 max-w-xl mx-auto">
@@ -97,13 +91,32 @@ export default function Home() {
       </section>
 
       <div className="max-w-5xl mx-auto px-4 flex flex-wrap gap-4 mb-10">
-        <input
-          type="text"
-          placeholder="Search players by name..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="flex-1 p-3 rounded bg-gray-800 border border-purple-500"
-        />
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            fetchPlayers();
+          }}
+          className="relative flex-1"
+        >
+          <input
+            type="search"
+            placeholder="Search players by name..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="w-full p-3 pl-10 rounded bg-gray-800 border border-purple-500 text-white"
+          />
+          <svg
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400"
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            fill="currentColor"
+            viewBox="0 0 16 16"
+          >
+            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242 1.106a5 5 0 1 1 0-10 5 5 0 0 1 0 10z" />
+          </svg>
+        </form>
+
         <select
           value={selectedTeam}
           onChange={(e) => setSelectedTeam(e.target.value)}
@@ -159,7 +172,7 @@ export default function Home() {
           </div>
         ))}
       </section>
-    </div>
+    </Layout>
   );
 }
 
