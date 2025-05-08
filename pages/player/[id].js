@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import api from '../../lib/bdlClient';
 import Layout from '../../components/Layout';
 
-export default function PlayerProfile({ player, stats, per }) {
+export default function PlayerProfile({ player, stats, netRating }) {
   const router = useRouter();
   const [pick, setPick] = useState(null);
   const [trend, setTrend] = useState('');
@@ -13,7 +13,7 @@ export default function PlayerProfile({ player, stats, per }) {
     const fetchPick = async () => {
       const session = await supabase.auth.getSession();
       const user = session?.data?.session?.user;
-      if (!user || !per || !player?.id) return;
+      if (!user || !netRating || !player?.id) return;
 
       const { data } = await supabase
         .from('picks')
@@ -24,29 +24,29 @@ export default function PlayerProfile({ player, stats, per }) {
 
       if (data) {
         setPick(data);
-        const delta = per - data.initial_per;
+        const delta = netRating - data.initial_net_rating;
         setTrend(delta > 0 ? '📈' : delta < 0 ? '📉' : '➖');
       }
     };
 
     fetchPick();
-  }, [player?.id, per]);
+  }, [player?.id, netRating]);
 
   const handlePick = async (selection) => {
     const session = await supabase.auth.getSession();
     const user = session?.data?.session?.user;
-    if (!user || !per) return;
+    if (!user || !netRating) return;
 
     const { data, error } = await supabase.from('picks').upsert({
       user_id: user.id,
       player_id: player.id,
       player_name: `${player.first_name} ${player.last_name}`,
       selection,
-      initial_per: per,
+      initial_net_rating: netRating,
     });
 
     if (!error) {
-      setPick({ selection, initial_per: per });
+      setPick({ selection, initial_net_rating: netRating });
     }
   };
 
@@ -71,8 +71,8 @@ export default function PlayerProfile({ player, stats, per }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-gray-800 p-6 rounded-xl border border-purple-500/30 shadow-md">
-              <h2 className="text-purple-300 text-lg font-semibold mb-2">Calculated PER (Season)</h2>
-              <p className="text-5xl font-bold text-purple-100 animate-pulse">{per ?? 'N/A'}</p>
+              <h2 className="text-purple-300 text-lg font-semibold mb-2">NET Rating (Advanced Stats)</h2>
+              <p className="text-5xl font-bold text-purple-100 animate-pulse">{netRating ?? 'N/A'}</p>
               {trend && (
                 <p className="text-gray-300 mt-2">Trend since your pick: <span className="text-xl">{trend}</span></p>
               )}
@@ -134,29 +134,23 @@ export async function getStaticProps({ params }) {
     const player = await res.json();
     if (!player || !player.id) return { notFound: true };
 
-    const averages = await api.nba.getSeasonAverages({
-      player_ids: [parseInt(id)],
-      season: 2023,
-    });
+    const advancedStatsRes = await fetch(`https://api.balldontlie.io/v1/stats/advanced?player_ids[]=${id}`);
+    const advancedStats = await advancedStatsRes.json();
 
     let stats = null;
-    let per = null;
+    let netRating = null;
 
-    if (averages.data.length > 0) {
-      stats = averages.data[0];
-      per = parseFloat((
-        stats.pts + stats.reb + stats.ast + stats.stl + stats.blk -
-        (stats.fga - stats.fgm) -
-        (stats.fta - stats.ftm) -
-        stats.turnover
-      ).toFixed(2));
+    if (advancedStats.data.length > 0) {
+      const recentStats = advancedStats.data[0];
+      stats = recentStats;
+      netRating = recentStats.net_rating;
     }
 
     return {
       props: {
         player,
         stats,
-        per,
+        netRating,
       },
       revalidate: 86400,
     };
@@ -165,4 +159,3 @@ export async function getStaticProps({ params }) {
     return { notFound: true };
   }
 }
-

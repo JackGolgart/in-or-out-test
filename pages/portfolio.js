@@ -65,7 +65,7 @@ export default function Portfolio() {
                   <tr>
                     <th className="text-left px-4 py-2">Player</th>
                     <th className="text-left px-4 py-2">Pick</th>
-                    <th className="text-left px-4 py-2">PER</th>
+                    <th className="text-left px-4 py-2">NET Rating</th>
                     <th className="text-left px-4 py-2">Date</th>
                   </tr>
                 </thead>
@@ -76,7 +76,7 @@ export default function Portfolio() {
                       <td className={`px-4 py-2 ${pick.selection === 'in' ? 'text-green-400' : 'text-red-400'}`}>
                         {pick.selection.toUpperCase()}
                       </td>
-                      <td className="px-4 py-2">{pick.initial_per}</td>
+                      <td className="px-4 py-2">{pick.initial_net_rating}</td>
                       <td className="px-4 py-2">{new Date(pick.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))}
@@ -85,7 +85,7 @@ export default function Portfolio() {
             </div>
 
             <div className="bg-gray-800 p-4 rounded">
-              <h2 className="text-xl font-semibold mb-3">Compare PER Trends</h2>
+              <h2 className="text-xl font-semibold mb-3">Compare NET Rating Trends</h2>
 
               <div className="flex flex-col sm:flex-row gap-4 mb-4">
                 {[0, 1].map(index => (
@@ -112,7 +112,7 @@ export default function Portfolio() {
                   .filter(p => selectedPlayers.includes(p.player_name))
                   .map(p => ({
                     date: new Date(p.created_at).toLocaleDateString(),
-                    per: parseFloat(p.initial_per),
+                    net_rating: parseFloat(p.initial_net_rating),
                     label: p.player_name,
                   }))}
               />
