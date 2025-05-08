@@ -22,66 +22,70 @@ export default function Home() {
   const [hasMore, setHasMore] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    const cached = localStorage.getItem('cached_players');
-    if (cached) {
-      setPlayers(JSON.parse(cached));
-    }
-  }, []);
-
-  useEffect(() => {
-    fetch('https://www.balldontlie.io/api/v1/teams')
-      .then(res => res.json())
-      .then(data => setTeams(data.data))
-      .catch(console.error);
-  }, []);
-
-  const fetchPlayers = async (isLoadMore = false) => {
-    setIsLoading(true);
+ useEffect(() => {
+  const cached = localStorage.getItem('cached_players');
+  if (cached) {
     try {
-      const options = {
-        per_page: 10,
-        page: isLoadMore ? page + 1 : 1,
-      };
-      if (query.length > 2) options.search = query;
-      if (selectedTeam) options.team_ids = [parseInt(selectedTeam)];
-
-      const response = await api.nba.getPlayers(options);
-      const newPlayers = Array.isArray(response.data) ? response.data : [];
-
-      const ids = newPlayers.map(p => p.id);
-      const averagesRes = await api.nba.getSeasonAverages({ player_ids: ids, season: 2023 });
-      const averagesMap = new Map(averagesRes.data.map(a => [a.player_id, a]));
-
-      const playerStats = newPlayers.map(player => {
-        const avg = averagesMap.get(player.id);
-        let per = null;
-
-        if (avg) {
-          per = (
-            avg.pts + avg.reb + avg.ast + avg.stl + avg.blk -
-            (avg.fga - avg.fgm) -
-            (avg.fta - avg.ftm) -
-            avg.turnover
-          ).toFixed(2);
-        }
-
-        return { ...player, per };
-      });
-
-      setPlayers(prev =>
-        isLoadMore ? [...prev, ...playerStats] : playerStats
-      );
-      localStorage.setItem('cached_players', JSON.stringify(playerStats));
-      setPage(isLoadMore ? page + 1 : 1);
-      setHasMore(newPlayers.length === 10);
-    } catch (error) {
-      console.error("Failed to fetch players:", error);
-      if (!isLoadMore) setPlayers([]);
-    } finally {
-      setIsLoading(false);
+      const parsed = JSON.parse(cached);
+      const valid = parsed.every(p => p.id && p.first_name && p.team?.abbreviation);
+      if (valid) {
+        setPlayers(parsed);
+      } else {
+        localStorage.removeItem('cached_players');
+      }
+    } catch {
+      localStorage.removeItem('cached_players');
     }
-  };
+  }
+}, []);
+
+
+const fetchPlayers = async (isLoadMore = false) => {
+  setIsLoading(true);
+  try {
+    const options = {
+      per_page: 10,
+      page: isLoadMore ? page + 1 : 1,
+    };
+    if (query.length > 2) options.search = query;
+    if (selectedTeam) options.team_ids = [parseInt(selectedTeam)];
+
+    const response = await api.nba.getPlayers(options);
+    const newPlayers = Array.isArray(response.data) ? response.data : [];
+
+    const ids = newPlayers.map(p => p.id);
+    const averagesRes = await api.nba.getSeasonAverages({ player_ids: ids, season: 2023 });
+    const averagesMap = new Map(averagesRes.data.map(a => [a.player_id, a]));
+
+    const playerStats = newPlayers.map(player => {
+      const avg = averagesMap.get(player.id);
+      let per = null;
+
+      if (avg) {
+        per = (
+          avg.pts + avg.reb + avg.ast + avg.stl + avg.blk -
+          (avg.fga - avg.fgm) -
+          (avg.fta - avg.ftm) -
+          avg.turnover
+        ).toFixed(2);
+      }
+
+      return { ...player, per };
+    });
+
+    const updatedPlayers = isLoadMore ? [...players, ...playerStats] : playerStats;
+    setPlayers(updatedPlayers);
+    localStorage.setItem('cached_players', JSON.stringify(updatedPlayers));
+    setPage(isLoadMore ? page + 1 : 1);
+    setHasMore(newPlayers.length === 10);
+  } catch (error) {
+    console.error("Failed to fetch players:", error);
+    if (!isLoadMore) setPlayers([]);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   useEffect(() => {
     const delay = setTimeout(() => fetchPlayers(false), 400);
