@@ -224,4 +224,4 @@ export default function Home() {
     </section>
   </Layout>
 );
-
+}
