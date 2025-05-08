@@ -19,11 +19,14 @@ export default function PlayerProfile() {
 
     const fetchPlayer = async () => {
       try {
-        const res = await fetch(`/api/player/${id}`);
-        const json = await res.json();
-        if (!res.ok || !json.player) throw new Error('Player not found');
-
-        setPlayer(json.player);
+        const res = await fetch(`https://api.balldontlie.io/v1/players/${id}`, {
+          headers: {
+            Authorization: `Bearer c81d57c3-85f8-40f2-ad5b-0c268c0220a0`,
+          },
+        });
+        const playerData = await res.json();
+        if (!res.ok || !playerData || playerData.id == null) throw new Error('Player not found');
+        setPlayer(playerData);
 
         const averages = await api.nba.getSeasonAverages({
           player_ids: [parseInt(id)],
@@ -42,27 +45,28 @@ export default function PlayerProfile() {
           ).toFixed(2);
 
           setPer(parseFloat(calculatedPER));
-        }
 
-        const session = await supabase.auth.getSession();
-        const user = session?.data?.session?.user;
-        if (user) {
-          const { data } = await supabase
-            .from('picks')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('player_id', id)
-            .maybeSingle();
+          const session = await supabase.auth.getSession();
+          const user = session?.data?.session?.user;
 
-          if (data) {
-            setPick(data);
-            const delta = per - data.initial_per;
-            setTrend(delta > 0 ? '📈' : delta < 0 ? '📉' : '➖');
+          if (user) {
+            const { data } = await supabase
+              .from('picks')
+              .select('*')
+              .eq('user_id', user.id)
+              .eq('player_id', id)
+              .maybeSingle();
+
+            if (data) {
+              setPick(data);
+              const delta = calculatedPER - data.initial_per;
+              setTrend(delta > 0 ? '📈' : delta < 0 ? '📉' : '➖');
+            }
           }
         }
-
       } catch (err) {
-        console.error('Error loading player:', err);
+        console.error('Error loading player:', err.message);
+        setPlayer(null);
       } finally {
         setLoading(false);
       }
@@ -89,8 +93,13 @@ export default function PlayerProfile() {
     }
   };
 
-  if (loading) return <Layout><div className="text-white p-6">Loading...</div></Layout>;
-  if (!player) return <Layout><div className="text-red-500 p-6">Player not found.</div></Layout>;
+  if (loading) {
+    return <Layout><div className="text-white p-6">Loading...</div></Layout>;
+  }
+
+  if (!player || !player.id) {
+    return <Layout><div className="text-red-500 p-6">Player not found.</div></Layout>;
+  }
 
   return (
     <Layout>
