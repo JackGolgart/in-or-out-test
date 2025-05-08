@@ -4,17 +4,33 @@ import { supabase } from '../../lib/supabase';
 import api from '../../lib/bdlClient';
 import Layout from '../../components/Layout';
 
-export default function PlayerProfile({ player, stats, per, pickData }) {
-  const [pick, setPick] = useState(pickData);
-  const [trend, setTrend] = useState('');
+export default function PlayerProfile({ player, stats, per }) {
   const router = useRouter();
+  const [pick, setPick] = useState(null);
+  const [trend, setTrend] = useState('');
 
   useEffect(() => {
-    if (pick && per) {
-      const delta = per - pick.initial_per;
-      setTrend(delta > 0 ? '📈' : delta < 0 ? '📉' : '➖');
-    }
-  }, [pick, per]);
+    const fetchPick = async () => {
+      const session = await supabase.auth.getSession();
+      const user = session?.data?.session?.user;
+      if (!user || !per || !player?.id) return;
+
+      const { data } = await supabase
+        .from('picks')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('player_id', player.id)
+        .maybeSingle();
+
+      if (data) {
+        setPick(data);
+        const delta = per - data.initial_per;
+        setTrend(delta > 0 ? '📈' : delta < 0 ? '📉' : '➖');
+      }
+    };
+
+    fetchPick();
+  }, [player?.id, per]);
 
   const handlePick = async (selection) => {
     const session = await supabase.auth.getSession();
@@ -141,14 +157,12 @@ export async function getStaticProps({ params }) {
         player,
         stats,
         per,
-        pickData: null,
       },
-      revalidate: 86400, // Refresh every 24 hours
+      revalidate: 86400,
     };
   } catch (err) {
-    console.error('Error fetching static props:', err.message);
+    console.error('Error fetching player:', err.message);
     return { notFound: true };
   }
 }
-
 
