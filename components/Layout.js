@@ -11,17 +11,10 @@ export default function Layout({ children }) {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-
-    // Remove player list cache
     localStorage.removeItem('cached_players');
-
-    // Remove all cached PER entries
     Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith('per:')) {
-        localStorage.removeItem(key);
-      }
+      if (key.startsWith('per:')) localStorage.removeItem(key);
     });
-
     window.location.href = '/login';
   };
 
@@ -61,9 +54,10 @@ export default function Layout({ children }) {
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <Link href="/" className="text-xl font-bold text-purple-400">NBA Picks</Link>
 
-          {/* Desktop Nav */}
+          {/* Desktop Navigation */}
           <nav className="hidden md:flex gap-4 text-sm">
             <Link href="/" className="hover:text-purple-300">Home</Link>
+            <Link href="/portfolio" className="hover:text-purple-300">Portfolio</Link>
             {user ? (
               <>
                 <Link href="/profile" className="hover:text-purple-300">Profile</Link>
@@ -77,7 +71,7 @@ export default function Layout({ children }) {
           {/* Mobile Toggle */}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="md:hidden text-purple-400 focus:outline-none"
+            className="md:hidden text-purple-400"
             aria-label="Toggle menu"
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -97,6 +91,7 @@ export default function Layout({ children }) {
             className="md:hidden fixed inset-0 z-40 bg-black/90 backdrop-blur-sm flex flex-col items-start p-6 space-y-4 text-sm animate-slide-down"
           >
             <Link href="/" onClick={() => setMenuOpen(false)} className="hover:text-purple-300">Home</Link>
+            <Link href="/portfolio" onClick={() => setMenuOpen(false)} className="hover:text-purple-300">Portfolio</Link>
             {user ? (
               <>
                 <Link href="/profile" onClick={() => setMenuOpen(false)} className="hover:text-purple-300">Profile</Link>
@@ -113,4 +108,3 @@ export default function Layout({ children }) {
     </>
   );
 }
-
