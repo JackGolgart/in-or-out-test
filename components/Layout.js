@@ -1,22 +1,46 @@
-// components/Layout.js
-import Head from 'next/head';
+import Link from 'next/link';
+import { useAuth } from '../lib/AuthContext';
+import { supabase } from '../lib/supabase';
 
-export default function Layout({ children, title = 'InOrOut' }) {
+export default function Layout({ children }) {
+  const { user } = useAuth();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/login';
+  };
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <Head>
-        <title>{title}</title>
-      </Head>
+    <>
+      <header className="bg-gray-950 text-white shadow-md">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+          <Link href="/">
+            <span className="text-xl font-bold text-purple-400 cursor-pointer">NBA Picks</span>
+          </Link>
 
-      <nav className="bg-gray-800 p-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-purple-300">🏀 InOrOut</h1>
-        <div className="space-x-4">
-          <a href="/" className="hover:text-purple-400">Home</a>
-          <a href="/portfolio" className="hover:text-purple-400">Portfolio</a>
+          <nav className="flex gap-4 text-sm">
+            <Link href="/">
+              <span className="hover:text-purple-300 cursor-pointer">Home</span>
+            </Link>
+            {user ? (
+              <>
+                <Link href="/profile">
+                  <span className="hover:text-purple-300 cursor-pointer">Profile</span>
+                </Link>
+                <button onClick={handleLogout} className="text-red-400 hover:text-red-500">
+                  Logout
+                </button>
+              </>
+            ) : (
+              <Link href="/login">
+                <span className="hover:text-purple-300 cursor-pointer">Login</span>
+              </Link>
+            )}
+          </nav>
         </div>
-      </nav>
+      </header>
 
-      <main>{children}</main>
-    </div>
+      <main className="bg-gray-900 min-h-screen text-white">{children}</main>
+    </>
   );
 }

@@ -18,6 +18,8 @@ export default function Home() {
   const [topOuts7d, setTopOuts7d] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [trendingView, setTrendingView] = useState('ins24h');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -27,27 +29,65 @@ export default function Home() {
       .catch(console.error);
   }, []);
 
-  const fetchPlayers = async () => {
+  const fetchPlayers = async (isLoadMore = false) => {
     setIsLoading(true);
     try {
       const options = {
-        per_page: 100,
+        per_page: 10,
+        page: isLoadMore ? page + 1 : 1,
       };
       if (query.length > 2) options.search = query;
       if (selectedTeam) options.team_ids = [parseInt(selectedTeam)];
 
       const response = await api.nba.getPlayers(options);
-      setPlayers(response.data || []);
+      const newPlayers = response.data || [];
+
+      // Fetch PER for each player
+      const playerStats = await Promise.all(
+        newPlayers.map(async (player) => {
+          const statsRes = await fetch(
+            `https://www.balldontlie.io/api/v1/season_averages?season=2023&player_ids[]=${player.id}`
+          );
+          const statsJson = await statsRes.json();
+          const s = statsJson.data[0];
+
+          let per = null;
+          if (s) {
+            per = (
+              s.pts +
+              s.reb +
+              s.ast +
+              s.stl +
+              s.blk -
+              (s.fga - s.fgm) -
+              (s.fta - s.ftm) -
+              s.turnover
+            ).toFixed(2);
+          }
+
+          return { ...player, per };
+        })
+      );
+
+      if (isLoadMore) {
+        setPlayers(prev => [...prev, ...playerStats]);
+        setPage(prev => prev + 1);
+      } else {
+        setPlayers(playerStats);
+        setPage(1);
+      }
+
+      setHasMore(newPlayers.length === 10);
     } catch (error) {
       console.error("Failed to fetch players:", error);
-      setPlayers([]);
+      if (!isLoadMore) setPlayers([]);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    const delay = setTimeout(fetchPlayers, 400);
+    const delay = setTimeout(() => fetchPlayers(false), 400);
     return () => clearTimeout(delay);
   }, [query, selectedTeam]);
 
@@ -88,6 +128,7 @@ export default function Home() {
         </div>
         <h3 className="text-white">{player.first_name} {player.last_name}</h3>
         <p className="text-gray-400 text-sm">{player.team.full_name}</p>
+        <p className="text-purple-300 text-sm mt-1">PER: {player.per ?? 'N/A'}</p>
         <button
           onClick={() => router.push(`/player/${player.id}`)}
           className="mt-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
@@ -111,7 +152,7 @@ export default function Home() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            fetchPlayers();
+            fetchPlayers(false);
           }}
           className="relative flex-1"
         >
@@ -122,16 +163,6 @@ export default function Home() {
             onChange={(e) => setQuery(e.target.value)}
             className="w-full p-3 pl-10 rounded bg-gray-800 border border-purple-500 text-white"
           />
-          <svg
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400"
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            fill="currentColor"
-            viewBox="0 0 16 16"
-          >
-            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242 1.106a5 5 0 1 1 0-10 5 5 0 0 1 0 10z" />
-          </svg>
         </form>
 
         <select
@@ -147,7 +178,7 @@ export default function Home() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {isLoading ? (
+        {isLoading && players.length === 0 ? (
           <p className="text-purple-400 col-span-full text-center animate-pulse">Loading players...</p>
         ) : players.length > 0 ? (
           players.map(player => (
@@ -161,6 +192,7 @@ export default function Home() {
               </div>
               <h3 className="text-white">{player.first_name} {player.last_name}</h3>
               <p className="text-gray-400 text-sm">{player.team.full_name}</p>
+              <p className="text-purple-300 text-sm mt-1">PER: {player.per ?? 'N/A'}</p>
               <p className="text-gray-400 text-sm">Position: {player.position || 'N/A'}</p>
               <button
                 onClick={() => router.push(`/player/${player.id}`)}
@@ -174,6 +206,17 @@ export default function Home() {
           <p className="text-gray-400 col-span-full text-center">No players found.</p>
         )}
       </div>
+
+      {hasMore && !isLoading && (
+        <div className="text-center mt-6">
+          <button
+            onClick={() => fetchPlayers(true)}
+            className="px-6 py-2 bg-purple-700 text-white rounded hover:bg-purple-800"
+          >
+            Load More Players
+          </button>
+        </div>
+      )}
 
       <section className="max-w-6xl mx-auto px-4 py-12">
         <div className="flex justify-between items-center mb-4">
