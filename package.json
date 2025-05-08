@@ -8,7 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "@balldontlie/sdk": "^1.0.0",
+    "@balldontlie/sdk": "^1.2.2",
     "@sentry/nextjs": "^9.16.1",
     "@supabase/supabase-js": "^2.39.5",
     "chart.js": "^4.4.9",

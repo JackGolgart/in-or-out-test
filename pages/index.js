@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 import { supabase } from '../lib/supabase';
+import api from '../lib/bdlClient';
 import Layout from '../components/Layout';
 import JerseyAvatar from '../components/JerseyAvatar';
 
@@ -26,20 +27,23 @@ export default function Home() {
       .catch(console.error);
   }, []);
 
-  const fetchPlayers = () => {
+  const fetchPlayers = async () => {
     setIsLoading(true);
-    let url = 'https://www.balldontlie.io/api/v1/players?per_page=100';
-    const params = [];
+    try {
+      const options = {
+        per_page: 100,
+      };
+      if (query.length > 2) options.search = query;
+      if (selectedTeam) options.team_ids = [parseInt(selectedTeam)];
 
-    if (query.length > 2) params.push(`search=${query}`);
-    if (selectedTeam) params.push(`team_ids[]=${selectedTeam}`);
-    if (params.length > 0) url += '&' + params.join('&');
-
-    fetch(url)
-      .then(res => res.json())
-      .then(data => setPlayers(data.data || []))
-      .catch(() => setPlayers([]))
-      .finally(() => setIsLoading(false));
+      const response = await api.nba.getPlayers(options);
+      setPlayers(response.data || []);
+    } catch (error) {
+      console.error("Failed to fetch players:", error);
+      setPlayers([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -175,18 +179,15 @@ export default function Home() {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold">Trending Players</h2>
           <div className="space-x-2">
-            <button onClick={() => setTrendingView('ins24h')} className={`px-4 py-2 rounded ${trendingView === 'ins24h' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
-              IN - 24H
-            </button>
-            <button onClick={() => setTrendingView('outs24h')} className={`px-4 py-2 rounded ${trendingView === 'outs24h' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
-              OUT - 24H
-            </button>
-            <button onClick={() => setTrendingView('ins7d')} className={`px-4 py-2 rounded ${trendingView === 'ins7d' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
-              IN - 7D
-            </button>
-            <button onClick={() => setTrendingView('outs7d')} className={`px-4 py-2 rounded ${trendingView === 'outs7d' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
-              OUT - 7D
-            </button>
+            {['ins24h', 'outs24h', 'ins7d', 'outs7d'].map(view => (
+              <button
+                key={view}
+                onClick={() => setTrendingView(view)}
+                className={`px-4 py-2 rounded ${trendingView === view ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+              >
+                {view.replace(/(ins|outs)/, m => m.toUpperCase()).replace('24h', ' - 24H').replace('7d', ' - 7D')}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -203,4 +204,3 @@ export default function Home() {
     </Layout>
   );
 }
-
