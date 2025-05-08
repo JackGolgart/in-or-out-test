@@ -4,17 +4,19 @@ import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 import { supabase } from '../lib/supabase';
 import Layout from '../components/Layout';
+import JerseyAvatar from '../components/JerseyAvatar';
 
 export default function Home() {
   const [query, setQuery] = useState('');
   const [players, setPlayers] = useState([]);
   const [teams, setTeams] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState('');
-  const [selectedPosition, setSelectedPosition] = useState('');
   const [topIns24h, setTopIns24h] = useState([]);
   const [topOuts24h, setTopOuts24h] = useState([]);
   const [topIns7d, setTopIns7d] = useState([]);
   const [topOuts7d, setTopOuts7d] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [trendingView, setTrendingView] = useState('ins24h');
   const router = useRouter();
 
   useEffect(() => {
@@ -25,21 +27,25 @@ export default function Home() {
   }, []);
 
   const fetchPlayers = () => {
+    setIsLoading(true);
     let url = 'https://www.balldontlie.io/api/v1/players?per_page=100';
-    if (query.length > 2) url += `&search=${query}`;
-    if (selectedTeam) url += `&team_ids[]=${selectedTeam}`;
-    if (selectedPosition) url += `&positions[]=${selectedPosition}`;
+    const params = [];
+
+    if (query.length > 2) params.push(`search=${query}`);
+    if (selectedTeam) params.push(`team_ids[]=${selectedTeam}`);
+    if (params.length > 0) url += '&' + params.join('&');
 
     fetch(url)
       .then(res => res.json())
-      .then(data => setPlayers(data.data))
-      .catch(() => setPlayers([]));
+      .then(data => setPlayers(data.data || []))
+      .catch(() => setPlayers([]))
+      .finally(() => setIsLoading(false));
   };
 
   useEffect(() => {
     const delay = setTimeout(fetchPlayers, 400);
     return () => clearTimeout(delay);
-  }, [query, selectedTeam, selectedPosition]);
+  }, [query, selectedTeam]);
 
   useEffect(() => {
     const fetchTopPicks = async (selection, timeframe, setter) => {
@@ -69,6 +75,13 @@ export default function Home() {
     if (!player) return null;
     return (
       <div className="p-4 bg-gray-800 rounded text-center">
+        <div className="flex flex-col items-center mb-2">
+          <JerseyAvatar
+            teamAbbr={player.team.abbreviation}
+            firstName={player.first_name}
+            lastName={player.last_name}
+          />
+        </div>
         <h3 className="text-white">{player.first_name} {player.last_name}</h3>
         <p className="text-gray-400 text-sm">{player.team.full_name}</p>
         <button
@@ -86,7 +99,7 @@ export default function Home() {
       <section className="text-center py-10 px-4">
         <h2 className="text-4xl font-extrabold mb-4">Pick Your Players</h2>
         <p className="text-gray-400 max-w-xl mx-auto">
-          Search NBA players, filter by team or position, and track top picks!
+          Search NBA players, filter by team, and track top picks!
         </p>
       </section>
 
@@ -127,50 +140,65 @@ export default function Home() {
             <option key={team.id} value={team.id}>{team.full_name}</option>
           ))}
         </select>
-        <select
-          value={selectedPosition}
-          onChange={(e) => setSelectedPosition(e.target.value)}
-          className="p-3 bg-gray-800 border border-purple-500 rounded text-white"
-        >
-          <option value="">All Positions</option>
-          {['G', 'F', 'C'].map(pos => (
-            <option key={pos} value={pos}>{pos}</option>
-          ))}
-        </select>
       </div>
 
       <div className="max-w-5xl mx-auto px-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {players.map(player => (
-          <div key={player.id} className="p-4 bg-gray-800 rounded shadow">
-            <h3 className="text-white">{player.first_name} {player.last_name}</h3>
-            <p className="text-gray-400 text-sm">{player.team.full_name}</p>
-            <p className="text-gray-400 text-sm">Position: {player.position || 'N/A'}</p>
-            <button
-              onClick={() => router.push(`/player/${player.id}`)}
-              className="mt-2 px-4 py-2 bg-purple-600 rounded hover:bg-purple-700"
-            >
-              View Profile
-            </button>
-          </div>
-        ))}
+        {isLoading ? (
+          <p className="text-purple-400 col-span-full text-center animate-pulse">Loading players...</p>
+        ) : players.length > 0 ? (
+          players.map(player => (
+            <div key={player.id} className="p-4 bg-gray-800 rounded text-center">
+              <div className="flex flex-col items-center mb-2">
+                <JerseyAvatar
+                  teamAbbr={player.team.abbreviation}
+                  firstName={player.first_name}
+                  lastName={player.last_name}
+                />
+              </div>
+              <h3 className="text-white">{player.first_name} {player.last_name}</h3>
+              <p className="text-gray-400 text-sm">{player.team.full_name}</p>
+              <p className="text-gray-400 text-sm">Position: {player.position || 'N/A'}</p>
+              <button
+                onClick={() => router.push(`/player/${player.id}`)}
+                className="mt-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+              >
+                View Profile
+              </button>
+            </div>
+          ))
+        ) : (
+          <p className="text-gray-400 col-span-full text-center">No players found.</p>
+        )}
       </div>
 
-      <section className="max-w-6xl mx-auto px-4 py-12 space-y-10">
-        {[
-          ['Top IN - 24H', topIns24h],
-          ['Top OUT - 24H', topOuts24h],
-          ['Top IN - 7D', topIns7d],
-          ['Top OUT - 7D', topOuts7d],
-        ].map(([title, picks]) => (
-          <div key={title}>
-            <h2 className="text-2xl font-bold mb-2">{title}</h2>
-            <Swiper spaceBetween={10} slidesPerView={3}>
-              {picks.map(p => (
-                <SwiperSlide key={p.player_id}>{renderPlayerCard(p.player_id)}</SwiperSlide>
-              ))}
-            </Swiper>
+      <section className="max-w-6xl mx-auto px-4 py-12">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">Trending Players</h2>
+          <div className="space-x-2">
+            <button onClick={() => setTrendingView('ins24h')} className={`px-4 py-2 rounded ${trendingView === 'ins24h' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
+              IN - 24H
+            </button>
+            <button onClick={() => setTrendingView('outs24h')} className={`px-4 py-2 rounded ${trendingView === 'outs24h' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
+              OUT - 24H
+            </button>
+            <button onClick={() => setTrendingView('ins7d')} className={`px-4 py-2 rounded ${trendingView === 'ins7d' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
+              IN - 7D
+            </button>
+            <button onClick={() => setTrendingView('outs7d')} className={`px-4 py-2 rounded ${trendingView === 'outs7d' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
+              OUT - 7D
+            </button>
           </div>
-        ))}
+        </div>
+
+        <Swiper spaceBetween={10} slidesPerView={3}>
+          {(trendingView === 'ins24h' ? topIns24h :
+            trendingView === 'outs24h' ? topOuts24h :
+            trendingView === 'ins7d' ? topIns7d :
+            topOuts7d
+          ).map(p => (
+            <SwiperSlide key={p.player_id}>{renderPlayerCard(p.player_id)}</SwiperSlide>
+          ))}
+        </Swiper>
       </section>
     </Layout>
   );

@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import getTeamLogo from '../../lib/teamLogos';
 
 export default function PlayerProfile() {
   const router = useRouter();
@@ -86,17 +87,32 @@ export default function PlayerProfile() {
   if (loading) return <div className="text-white p-6">Loading...</div>;
   if (!player) return <div className="text-red-500 p-6">Player not found.</div>;
 
+  const logoUrl = getTeamLogo(player.team?.abbreviation);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black to-gray-900 text-white px-6 py-12">
-      <div className="max-w-4xl mx-auto space-y-10">
+    <div
+      className="min-h-screen bg-gradient-to-br from-black to-gray-900 text-white px-6 py-12 relative overflow-hidden"
+      style={{
+        backgroundImage: `url(${logoUrl})`,
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'center',
+        backgroundSize: '30%',
+        opacity: 1,
+        backgroundBlendMode: 'soft-light',
+      }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-br from-black to-gray-900 opacity-80 pointer-events-none"></div>
+      <div className="relative max-w-4xl mx-auto space-y-10">
         <div className="text-center">
-          <h1 className="text-4xl font-bold tracking-wide">
+          <h1 className="text-4xl font-bold tracking-wide relative z-10">
             {player.first_name} {player.last_name}
           </h1>
-          <p className="text-gray-400">{player.position} — {player.team?.full_name}</p>
+          <p className="text-gray-400 relative z-10">
+            {player.position} — {player.team?.full_name}
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
           <div className="bg-gray-800 p-6 rounded-xl border border-purple-500/30 shadow-md">
             <h2 className="text-purple-300 text-lg font-semibold mb-2">Calculated PER (Season)</h2>
             <p className="text-5xl font-bold text-purple-100 animate-pulse">{per ?? 'N/A'}</p>
@@ -122,7 +138,7 @@ export default function PlayerProfile() {
           </div>
         </div>
 
-        <div className="bg-gray-900 p-6 rounded-xl border border-slate-600 mt-4">
+        <div className="bg-gray-900 p-6 rounded-xl border border-slate-600 mt-4 relative z-10">
           <h3 className="text-white text-lg font-bold mb-2">Season Averages (2023)</h3>
           {stats ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm text-gray-300">
@@ -139,3 +155,4 @@ export default function PlayerProfile() {
     </div>
   );
 }
+
