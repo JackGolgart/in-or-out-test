@@ -23,6 +23,13 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
+    const cached = localStorage.getItem('cached_players');
+    if (cached) {
+      setPlayers(JSON.parse(cached));
+    }
+  }, []);
+
+  useEffect(() => {
     fetch('https://www.balldontlie.io/api/v1/teams')
       .then(res => res.json())
       .then(data => setTeams(data.data))
@@ -42,41 +49,39 @@ export default function Home() {
       const response = await api.nba.getPlayers(options);
       const newPlayers = response.data || [];
 
-      // Fetch PER for each player
       const playerStats = await Promise.all(
         newPlayers.map(async (player) => {
-          const statsRes = await fetch(
-            `https://www.balldontlie.io/api/v1/season_averages?season=2023&player_ids[]=${player.id}`
-          );
-          const statsJson = await statsRes.json();
-          const s = statsJson.data[0];
-
           let per = null;
-          if (s) {
-            per = (
-              s.pts +
-              s.reb +
-              s.ast +
-              s.stl +
-              s.blk -
-              (s.fga - s.fgm) -
-              (s.fta - s.ftm) -
-              s.turnover
-            ).toFixed(2);
+          try {
+            const statsRes = await fetch(
+              `https://www.balldontlie.io/api/v1/season_averages?season=2023&player_ids[]=${player.id}`
+            );
+            const statsJson = await statsRes.json();
+            const s = statsJson.data[0];
+            if (s) {
+              per = (
+                s.pts +
+                s.reb +
+                s.ast +
+                s.stl +
+                s.blk -
+                (s.fga - s.fgm) -
+                (s.fta - s.ftm) -
+                s.turnover
+              ).toFixed(2);
+            }
+          } catch (err) {
+            console.warn(`Failed PER fetch for player ${player.id}`);
           }
 
           return { ...player, per };
         })
       );
 
-      if (isLoadMore) {
-        setPlayers(prev => [...prev, ...playerStats]);
-        setPage(prev => prev + 1);
-      } else {
-        setPlayers(playerStats);
-        setPage(1);
-      }
-
+      const combinedPlayers = isLoadMore ? [...players, ...playerStats] : playerStats;
+      setPlayers(combinedPlayers);
+      localStorage.setItem('cached_players', JSON.stringify(combinedPlayers));
+      setPage(isLoadMore ? page + 1 : 1);
       setHasMore(newPlayers.length === 10);
     } catch (error) {
       console.error("Failed to fetch players:", error);
@@ -118,22 +123,23 @@ export default function Home() {
     const player = players.find(p => p.id === playerId);
     if (!player) return null;
     return (
-      <div className="p-4 bg-gray-800 rounded text-center">
-        <div className="flex flex-col items-center mb-2">
+      <div className="p-4 bg-gray-800 rounded text-center shadow-md flex flex-col items-center">
+        <div className="mb-2">
           <JerseyAvatar
             teamAbbr={player.team.abbreviation}
             firstName={player.first_name}
             lastName={player.last_name}
           />
         </div>
-        <h3 className="text-white">{player.first_name} {player.last_name}</h3>
-        <p className="text-gray-400 text-sm">{player.team.full_name}</p>
+        <h3 className="text-white text-lg">{player.first_name} {player.last_name}</h3>
+        <p className="text-gray-400 text-xs">{player.team.full_name}</p>
         <p className="text-purple-300 text-sm mt-1">PER: {player.per ?? 'N/A'}</p>
+        <p className="text-gray-400 text-xs">Position: {player.position || 'N/A'}</p>
         <button
           onClick={() => router.push(`/player/${player.id}`)}
-          className="mt-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+          className="mt-2 px-4 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700"
         >
-          View Profile
+          View
         </button>
       </div>
     );
@@ -181,27 +187,7 @@ export default function Home() {
         {isLoading && players.length === 0 ? (
           <p className="text-purple-400 col-span-full text-center animate-pulse">Loading players...</p>
         ) : players.length > 0 ? (
-          players.map(player => (
-            <div key={player.id} className="p-4 bg-gray-800 rounded text-center">
-              <div className="flex flex-col items-center mb-2">
-                <JerseyAvatar
-                  teamAbbr={player.team.abbreviation}
-                  firstName={player.first_name}
-                  lastName={player.last_name}
-                />
-              </div>
-              <h3 className="text-white">{player.first_name} {player.last_name}</h3>
-              <p className="text-gray-400 text-sm">{player.team.full_name}</p>
-              <p className="text-purple-300 text-sm mt-1">PER: {player.per ?? 'N/A'}</p>
-              <p className="text-gray-400 text-sm">Position: {player.position || 'N/A'}</p>
-              <button
-                onClick={() => router.push(`/player/${player.id}`)}
-                className="mt-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
-              >
-                View Profile
-              </button>
-            </div>
-          ))
+          players.map(player => renderPlayerCard(player.id))
         ) : (
           <p className="text-gray-400 col-span-full text-center">No players found.</p>
         )}
@@ -247,3 +233,4 @@ export default function Home() {
     </Layout>
   );
 }
+
