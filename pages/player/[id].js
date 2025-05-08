@@ -4,76 +4,17 @@ import { supabase } from '../../lib/supabase';
 import api from '../../lib/bdlClient';
 import Layout from '../../components/Layout';
 
-export default function PlayerProfile() {
-  const router = useRouter();
-  const { id } = router.query;
-  const [player, setPlayer] = useState(null);
-  const [stats, setStats] = useState(null);
-  const [per, setPer] = useState(null);
-  const [pick, setPick] = useState(null);
+export default function PlayerProfile({ player, stats, per, pickData }) {
+  const [pick, setPick] = useState(pickData);
   const [trend, setTrend] = useState('');
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    if (!id) return;
-
-    const fetchPlayer = async () => {
-      try {
-        const res = await fetch(`https://api.balldontlie.io/v1/players/${id}`, {
-          headers: {
-            Authorization: `Bearer c81d57c3-85f8-40f2-ad5b-0c268c0220a0`,
-          },
-        });
-        const playerData = await res.json();
-        if (!res.ok || !playerData || playerData.id == null) throw new Error('Player not found');
-        setPlayer(playerData);
-
-        const averages = await api.nba.getSeasonAverages({
-          player_ids: [parseInt(id)],
-          season: 2023,
-        });
-
-        if (averages.data.length > 0) {
-          const avg = averages.data[0];
-          setStats(avg);
-
-          const calculatedPER = (
-            avg.pts + avg.reb + avg.ast + avg.stl + avg.blk -
-            (avg.fga - avg.fgm) -
-            (avg.fta - avg.ftm) -
-            avg.turnover
-          ).toFixed(2);
-
-          setPer(parseFloat(calculatedPER));
-
-          const session = await supabase.auth.getSession();
-          const user = session?.data?.session?.user;
-
-          if (user) {
-            const { data } = await supabase
-              .from('picks')
-              .select('*')
-              .eq('user_id', user.id)
-              .eq('player_id', id)
-              .maybeSingle();
-
-            if (data) {
-              setPick(data);
-              const delta = calculatedPER - data.initial_per;
-              setTrend(delta > 0 ? '📈' : delta < 0 ? '📉' : '➖');
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Error loading player:', err.message);
-        setPlayer(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPlayer();
-  }, [id]);
+    if (pick && per) {
+      const delta = per - pick.initial_per;
+      setTrend(delta > 0 ? '📈' : delta < 0 ? '📉' : '➖');
+    }
+  }, [pick, per]);
 
   const handlePick = async (selection) => {
     const session = await supabase.auth.getSession();
@@ -82,7 +23,7 @@ export default function PlayerProfile() {
 
     const { data, error } = await supabase.from('picks').upsert({
       user_id: user.id,
-      player_id: parseInt(id),
+      player_id: player.id,
       player_name: `${player.first_name} ${player.last_name}`,
       selection,
       initial_per: per,
@@ -93,7 +34,7 @@ export default function PlayerProfile() {
     }
   };
 
-  if (loading) {
+  if (router.isFallback) {
     return <Layout><div className="text-white p-6">Loading...</div></Layout>;
   }
 
@@ -156,4 +97,58 @@ export default function PlayerProfile() {
     </Layout>
   );
 }
+
+export async function getStaticPaths() {
+  return {
+    paths: [],
+    fallback: 'blocking',
+  };
+}
+
+export async function getStaticProps({ params }) {
+  const { id } = params;
+
+  try {
+    const res = await fetch(`https://api.balldontlie.io/v1/players/${id}`, {
+      headers: {
+        Authorization: 'Bearer c81d57c3-85f8-40f2-ad5b-0c268c0220a0',
+      },
+    });
+
+    const player = await res.json();
+    if (!player || !player.id) return { notFound: true };
+
+    const averages = await api.nba.getSeasonAverages({
+      player_ids: [parseInt(id)],
+      season: 2023,
+    });
+
+    let stats = null;
+    let per = null;
+
+    if (averages.data.length > 0) {
+      stats = averages.data[0];
+      per = parseFloat((
+        stats.pts + stats.reb + stats.ast + stats.stl + stats.blk -
+        (stats.fga - stats.fgm) -
+        (stats.fta - stats.ftm) -
+        stats.turnover
+      ).toFixed(2));
+    }
+
+    return {
+      props: {
+        player,
+        stats,
+        per,
+        pickData: null,
+      },
+      revalidate: 86400, // Refresh every 24 hours
+    };
+  } catch (err) {
+    console.error('Error fetching static props:', err.message);
+    return { notFound: true };
+  }
+}
+
 
