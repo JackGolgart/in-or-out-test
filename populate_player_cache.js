@@ -3,6 +3,8 @@ import fetch from "node-fetch"; // Ensure node-fetch is installed
 
 const BASE_URL = "https://api.balldontlie.io/v1";
 const API_KEY = "c81d57c3-85f8-40f2-ad5b-0c268c0220a0"; // Your API key here
+const MAX_PAGES = 6; // Limit the number of pages to fetch
+const BATCH_SIZE = 5; // Number of rows to insert per batch
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -24,9 +26,9 @@ async function fetchWithApiKey(url) {
 
 async function fetchAllPlayers() {
   let page = 1; // Start with the first page
-  const allPlayers = [];
+  const allPlayers = []; // Array to store all players
 
-  while (true) {
+  while (page <= MAX_PAGES) { // Limit the number of pages to fetch
     try {
       console.log(`Fetching players from page: ${page}`);
       const response = await fetchWithApiKey(`${BASE_URL}/players?page=${page}&per_page=100`);
@@ -38,12 +40,7 @@ async function fetchAllPlayers() {
       // Add the players from the current page to the result
       allPlayers.push(...response.data);
 
-      // Check if there are more pages to fetch
-      if (!response.meta || !response.meta.next_page) {
-        break; // Exit the loop if there are no more pages
-      }
-
-      page++; // Proceed to the next page
+      page++; // Increment the page number
       await delay(200); // Add delay to avoid hitting rate limits
     } catch (error) {
       console.error(`Error fetching players from page ${page}:`, error);
@@ -51,36 +48,43 @@ async function fetchAllPlayers() {
     }
   }
 
+  console.log(`Fetched a total of ${allPlayers.length} players.`);
   return allPlayers;
 }
 
 async function populatePlayerCache() {
   const players = await fetchAllPlayers();
 
-  for (const player of players) {
+  for (let i = 0; i < players.length; i += BATCH_SIZE) {
+    const batch = players.slice(i, i + BATCH_SIZE).map((player) => ({
+      player_id: player.id,
+      player: {
+        first_name: player.first_name,
+        last_name: player.last_name,
+        team: player.team,
+        position: player.position,
+      },
+      updated_at: new Date().toISOString(),
+    }));
+
     try {
-      const { id, first_name, last_name, team, position } = player;
+      console.log(`Inserting batch of ${batch.length} players...`);
 
-      console.log(`Inserting data for player ID: ${id}`);
-
-      // Insert player details into Supabase
-      const { data, error } = await supabase.from("player_cache").upsert({
-        player_id: id,
-        player: { first_name, last_name, team, position },
-        updated_at: new Date().toISOString(),
-      });
+      const { data, error } = await supabase.from("player_cache").upsert(batch).select();
 
       if (error) {
-        console.error(`Error inserting player ID ${id}:`, error);
+        console.error("Error upserting batch:", error);
       } else {
-        console.log(`Successfully inserted player ID ${id}`);
+        console.log(`Successfully upserted ${data.length || batch.length} rows in batch.`);
       }
 
-      await delay(200); // Add delay to avoid rate limits
+      await delay(200); // Add delay to avoid hitting rate limits
     } catch (error) {
-      console.error(`Failed to process player ID ${player.id}:`, error);
+      console.error("Failed to process batch:", error);
     }
   }
+
+  console.log("All players have been processed.");
 }
 
 populatePlayerCache();
