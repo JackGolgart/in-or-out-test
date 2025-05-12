@@ -86,6 +86,7 @@ export default function HomePage() {
   const [hasMore, setHasMore] = useState(true);
   const [renderStart] = useState(Date.now());
   const [searchMessage, setSearchMessage] = useState('');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     return () => {
@@ -127,6 +128,7 @@ export default function HomePage() {
 
   const fetchPlayers = async (isLoadMore = false) => {
     setIsLoading(true);
+    setError(null);
     try {
       const options = {
         per_page: 10,
@@ -155,8 +157,9 @@ export default function HomePage() {
       localStorage.setItem('cached_players', JSON.stringify(updatedPlayers));
       setPage(isLoadMore ? page + 1 : 1);
       setHasMore(newPlayers.length === 10);
-    } catch (error) {
-      console.error("Failed to fetch players:", error);
+    } catch (err) {
+      console.error("Failed to fetch players:", err);
+      setError("Failed to fetch players. Please try again later.");
       if (!isLoadMore) setPlayers([]);
     } finally {
       setIsLoading(false);
