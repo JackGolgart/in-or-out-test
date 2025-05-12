@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
-import { supabase } from '../lib/supabase';
 import api from '../lib/bdlClient';
 import Layout from '../components/Layout';
 import JerseyAvatar from '../components/JerseyAvatar';
@@ -81,12 +80,7 @@ export default function HomePage() {
   const [players, setPlayers] = useState([]);
   const [query, setQuery] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('');
-  const [topIns24h, setTopIns24h] = useState([]);
-  const [topOuts24h, setTopOuts24h] = useState([]);
-  const [topIns7d, setTopIns7d] = useState([]);
-  const [topOuts7d, setTopOuts7d] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [trendingView, setTrendingView] = useState('ins24h');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [renderStart] = useState(Date.now());
@@ -144,23 +138,15 @@ export default function HomePage() {
       const newPlayers = Array.isArray(response.data) ? response.data : [];
 
       const ids = newPlayers.map(p => p.id);
-      const averagesRes = await api.nba.getSeasonAverages({ player_ids: ids, season: 2023 });
-      const averagesMap = new Map(averagesRes.data.map(a => [a.player_id, a]));
+      const statsRes = await api.nba.getPlayerStats({ player_ids: ids, season: 2023 });
+      const statsMap = new Map(statsRes.data.map(stats => [stats.player_id, stats]));
 
       const playerStats = newPlayers.map(player => {
-        const avg = averagesMap.get(player.id);
-        let per = null;
-
-        if (avg) {
-          per = (
-            avg.pts + avg.reb + avg.ast + avg.stl + avg.blk -
-            (avg.fga - avg.fgm) -
-            (avg.fta - avg.ftm) -
-            avg.turnover
-          ).toFixed(2);
-        }
-
-        return { ...player, per };
+        const stats = statsMap.get(player.id);
+        return {
+          ...player,
+          netRating: stats?.net_rating ?? null
+        };
       });
 
       const updatedPlayers = isLoadMore ? [...players, ...playerStats] : playerStats;
@@ -176,31 +162,7 @@ export default function HomePage() {
     }
   };
 
-  useEffect(() => {
-    const fetchTopPicks = async (selection, timeframe, setter) => {
-      const { data } = await supabase
-        .from('picks')
-        .select('player_id, count:player_id')
-        .eq('selection', selection)
-        .gte('created_at', timeframe)
-        .group('player_id')
-        .order('count', { ascending: false })
-        .limit(10);
-      if (data) setter(data);
-    };
-
-    const now = new Date();
-    const past24h = new Date(now - 864e5).toISOString();
-    const past7d = new Date(now - 7 * 864e5).toISOString();
-
-    fetchTopPicks('in', past24h, setTopIns24h);
-    fetchTopPicks('out', past24h, setTopOuts24h);
-    fetchTopPicks('in', past7d, setTopIns7d);
-    fetchTopPicks('out', past7d, setTopOuts7d);
-  }, []);
-
-  const renderPlayerCard = (playerId) => {
-    const player = players.find(p => p.id === playerId);
+  const renderPlayerCard = (player) => {
     if (!player) return null;
     return (
       <div className="p-4 bg-gray-800 rounded text-center shadow-md flex flex-col items-center">
@@ -213,7 +175,7 @@ export default function HomePage() {
         </div>
         <h3 className="text-white text-lg">{player.first_name} {player.last_name}</h3>
         <p className="text-gray-400 text-xs">{player.team.full_name}</p>
-        <p className="text-purple-300 text-sm mt-1">PER: {player.per ?? 'N/A'}</p>
+        <p className="text-purple-300 text-sm mt-1">NET Rating: {player.netRating !== null ? player.netRating.toFixed(1) : 'N/A'}</p>
         <p className="text-gray-400 text-xs">Position: {player.position || 'N/A'}</p>
         <button
           onClick={() => router.push(`/player/${player.id}`)}
@@ -240,7 +202,7 @@ export default function HomePage() {
                 NBA Player Stats
               </h1>
               <p className="text-lg md:text-xl text-gray-200 max-w-2xl">
-                Track performance, analyze statistics, and discover rising stars in the NBA.
+                Track performance, analyze statistics, and discover player ratings in the NBA.
               </p>
             </div>
           </div>
@@ -270,9 +232,7 @@ export default function HomePage() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-              {players.map(player => (
-                <PlayerCard key={player.id} player={player} />
-              ))}
+              {players.map(player => renderPlayerCard(player))}
             </div>
 
             {isLoading && (
@@ -284,7 +244,7 @@ export default function HomePage() {
               </div>
             )}
 
-            {!isLoading && players.length > 0 && (
+            {!isLoading && players.length > 0 && hasMore && (
               <div className="text-center pb-8">
                 <button
                   onClick={() => fetchPlayers(true)}
@@ -307,33 +267,6 @@ export default function HomePage() {
               </div>
             )}
           </div>
-
-          <section className="max-w-6xl mx-auto px-4 py-12">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Trending Players</h2>
-              <div className="space-x-2">
-                {['ins24h', 'outs24h', 'ins7d', 'outs7d'].map(view => (
-                  <button
-                    key={view}
-                    onClick={() => setTrendingView(view)}
-                    className={`px-4 py-2 rounded ${trendingView === view ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`}
-                  >
-                    {view.replace(/(ins|outs)/, m => m.toUpperCase()).replace('24h', ' - 24H').replace('7d', ' - 7D')}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <Swiper spaceBetween={10} slidesPerView={3}>
-              {(trendingView === 'ins24h' ? topIns24h :
-                trendingView === 'outs24h' ? topOuts24h :
-                trendingView === 'ins7d' ? topIns7d :
-                topOuts7d
-              ).map(p => (
-                <SwiperSlide key={p.player_id}>{renderPlayerCard(p.player_id)}</SwiperSlide>
-              ))}
-            </Swiper>
-          </section>
         </div>
       </ErrorBoundary>
     </Layout>
