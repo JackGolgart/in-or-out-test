@@ -1,10 +1,12 @@
 import { supabase } from "./lib/supabase.js";
-import fetch from "node-fetch"; // Ensure node-fetch is installed
+import { batchUpdatePlayerCache, cleanupOldCache } from "./lib/playerCache.js";
+import fetch from "node-fetch";
 
 const BASE_URL = "https://api.balldontlie.io/v1";
-const API_KEY = "c81d57c3-85f8-40f2-ad5b-0c268c0220a0"; // Your API key here
-const MAX_PAGES = 6; // Limit the number of pages to fetch
-const BATCH_SIZE = 5; // Number of rows to insert per batch
+const API_KEY = "c81d57c3-85f8-40f2-ad5b-0c268c0220a0";
+const MAX_PAGES = 6;
+const BATCH_SIZE = 5;
+const RATE_LIMIT_DELAY = 200;
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -25,23 +27,21 @@ async function fetchWithApiKey(url) {
 }
 
 async function fetchAllPlayers() {
-  let page = 1; // Start with the first page
-  const allPlayers = []; // Array to store all players
+  let page = 1;
+  const allPlayers = [];
 
-  while (page <= MAX_PAGES) { // Limit the number of pages to fetch
+  while (page <= MAX_PAGES) {
     try {
       console.log(`Fetching players from page: ${page}`);
       const response = await fetchWithApiKey(`${BASE_URL}/players?page=${page}&per_page=100`);
 
       if (!response.data || response.data.length === 0) {
-        break; // No more players to fetch
+        break;
       }
 
-      // Add the players from the current page to the result
       allPlayers.push(...response.data);
-
-      page++; // Increment the page number
-      await delay(200); // Add delay to avoid hitting rate limits
+      page++;
+      await delay(RATE_LIMIT_DELAY);
     } catch (error) {
       console.error(`Error fetching players from page ${page}:`, error);
       break;
@@ -52,39 +52,57 @@ async function fetchAllPlayers() {
   return allPlayers;
 }
 
+async function fetchPlayerData(player) {
+  try {
+    const [advancedStats, seasonAverages] = await Promise.all([
+      fetchWithApiKey(`${BASE_URL}/stats/advanced?player_ids[]=${player.id}`),
+      fetchWithApiKey(`${BASE_URL}/season_averages?player_ids[]=${player.id}&season=2023`)
+    ]);
+
+    return {
+      id: player.id,
+      playerData: player,
+      advancedStats: advancedStats.data[0] || null,
+      seasonAverages: seasonAverages.data[0] || null
+    };
+  } catch (error) {
+    console.error(`Error fetching data for player ${player.id}:`, error);
+    return null;
+  }
+}
+
 async function populatePlayerCache() {
+  console.log("Starting cache population...");
+  
+  // Clean up old cache entries first
+  await cleanupOldCache();
+  console.log("Old cache entries cleaned up.");
+
   const players = await fetchAllPlayers();
+  console.log(`Starting to process ${players.length} players...`);
 
   for (let i = 0; i < players.length; i += BATCH_SIZE) {
-    const batch = players.slice(i, i + BATCH_SIZE).map((player) => ({
-      player_id: player.id,
-      player: {
-        first_name: player.first_name,
-        last_name: player.last_name,
-        team: player.team,
-        position: player.position,
-      },
-      updated_at: new Date().toISOString(),
-    }));
-
+    const batch = players.slice(i, i + BATCH_SIZE);
+    const batchPromises = batch.map(player => fetchPlayerData(player));
+    
     try {
-      console.log(`Inserting batch of ${batch.length} players...`);
-
-      const { data, error } = await supabase.from("player_cache").upsert(batch).select();
-
-      if (error) {
-        console.error("Error upserting batch:", error);
-      } else {
-        console.log(`Successfully upserted ${data.length || batch.length} rows in batch.`);
+      console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}...`);
+      const batchResults = await Promise.all(batchPromises);
+      const validResults = batchResults.filter(Boolean);
+      
+      if (validResults.length > 0) {
+        await batchUpdatePlayerCache(validResults);
+        console.log(`Successfully cached batch of ${validResults.length} players.`);
       }
 
-      await delay(200); // Add delay to avoid hitting rate limits
+      await delay(RATE_LIMIT_DELAY);
     } catch (error) {
       console.error("Failed to process batch:", error);
     }
   }
 
-  console.log("All players have been processed.");
+  console.log("Cache population completed.");
 }
 
-populatePlayerCache();
+// Run the script
+populatePlayerCache().catch(console.error);

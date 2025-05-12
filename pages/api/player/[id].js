@@ -1,59 +1,58 @@
-import { supabase } from '../../../lib/supabase';
 import api from '../../../lib/bdlClient';
+import { getPlayerFromCache, updatePlayerCache } from '../../../lib/playerCache';
 
 export default async function handler(req, res) {
   const { id } = req.query;
-
   if (!id) return res.status(400).json({ error: 'Missing player ID' });
 
   try {
-    // Check Supabase cache
-    const { data: cached, error } = await supabase
-      .from('player_cache')
-      .select('*')
-      .eq('player_id', id)
-      .maybeSingle();
-
-    const isFresh = cached?.updated_at && Date.now() - new Date(cached.updated_at).getTime() < 86400000;
-
-    if (isFresh) {
+    // Try to get from cache first
+    const cachedData = await getPlayerFromCache(id);
+    if (cachedData) {
       return res.status(200).json({
-        player: cached.player,
-        seasonAverages: cached.season_averages,
+        player: cachedData.player,
+        advancedStats: cachedData.advancedStats,
+        seasonAverages: cachedData.seasonAverages,
+        isCached: true
       });
     }
 
-    // Fetch player directly by ID
-    const resPlayer = await fetch(`https://api.balldontlie.io/v1/players/${id}`, {
-      headers: {
-        Authorization: `Bearer c81d57c3-85f8-40f2-ad5b-0c268c0220a0`,
-      },
-    });
+    // If not in cache, fetch fresh data
+    const [playerRes, advancedStatsRes, seasonAveragesRes] = await Promise.all([
+      api.nba.getPlayers({ search: id }),
+      fetch(`https://api.balldontlie.io/v1/stats/advanced?player_ids[]=${id}`, {
+        headers: {
+          Authorization: `Bearer c81d57c3-85f8-40f2-ad5b-0c268c0220a0`,
+        },
+      }),
+      api.nba.getSeasonAverages({
+        player_ids: [parseInt(id)],
+        season: 2023,
+      })
+    ]);
 
-    const player = await resPlayer.json();
-    if (!player || !player.id) {
-      return res.status(404).json({ error: 'Player not found' });
-    }
+    const player = playerRes.data.find(p => String(p.id) === id);
+    if (!player) return res.status(404).json({ error: 'Player not found' });
 
-    // Fetch season averages
-    const averages = await api.nba.getSeasonAverages({
-      player_ids: [parseInt(id)],
-      season: 2023,
-    });
+    const advancedStats = await advancedStatsRes.json();
+    const advancedStatsData = advancedStats.data.length > 0 ? advancedStats.data[0] : null;
+    const seasonAverages = seasonAveragesRes.data.length > 0 ? seasonAveragesRes.data[0] : null;
 
-    const seasonAverages = averages.data.length > 0 ? averages.data[0] : null;
-
-    // Cache in Supabase
-    await supabase.from('player_cache').upsert({
-      player_id: player.id,
+    // Cache the new data
+    const newData = {
       player,
-      season_averages: seasonAverages,
-      updated_at: new Date().toISOString(),
-    });
+      advancedStats: advancedStatsData,
+      seasonAverages
+    };
 
-    res.status(200).json({ player, seasonAverages });
+    await updatePlayerCache(player.id, newData);
+
+    res.status(200).json({
+      ...newData,
+      isCached: false
+    });
   } catch (err) {
-    console.error('API Error:', err.message);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('API error:', err);
+    res.status(500).json({ error: 'Internal error' });
   }
 }

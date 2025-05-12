@@ -7,30 +7,10 @@ const supabase = createClient(
 
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
-async function fetchPlayerStats(playerId, season = 2023) {
-  const res = await fetch(`https://www.balldontlie.io/api/v1/stats?player_ids[]=${playerId}&seasons[]=${season}&per_page=100`);
+async function fetchPlayerAdvancedStats(playerId, season = 2023) {
+  const res = await fetch(`https://api.balldontlie.io/v1/stats/advanced?player_ids[]=${playerId}&seasons[]=${season}&per_page=100`);
   const json = await res.json();
   return json.data;
-}
-
-function calculatePER(stats) {
-  let totalPTS = 0, totalREB = 0, totalAST = 0, totalSTL = 0, totalBLK = 0;
-  let missedFG = 0, missedFT = 0, totalTO = 0, gamesPlayed = stats.length;
-
-  stats.forEach(game => {
-    totalPTS += game.pts;
-    totalREB += game.reb;
-    totalAST += game.ast;
-    totalSTL += game.stl;
-    totalBLK += game.blk;
-    missedFG += (game.fga - game.fgm);
-    missedFT += (game.fta - game.ftm);
-    totalTO += game.turnover;
-  });
-
-  return gamesPlayed
-    ? (totalPTS + totalREB + totalAST + totalSTL + totalBLK - missedFG - missedFT - totalTO) / gamesPlayed
-    : 0;
 }
 
 export default async function handler(req, res) {
@@ -48,8 +28,8 @@ export default async function handler(req, res) {
 
   for (const id of playerIds) {
     try {
-      const stats = await fetchPlayerStats(id);
-      const per = calculatePER(stats);
+      const advancedStats = await fetchPlayerAdvancedStats(id);
+      const netRating = advancedStats.length > 0 ? advancedStats[0].net_rating : null;
       const playerRes = await fetch(`https://www.balldontlie.io/api/v1/players/${id}`);
       const player = await playerRes.json();
 
@@ -59,11 +39,14 @@ export default async function handler(req, res) {
         last_name: player.last_name,
         team: player.team.full_name,
         position: player.position,
-        current_per: per,
+        net_rating: netRating,
       });
 
       if (error) throw error;
-      inserted.push({ name: `${player.first_name} ${player.last_name}`, per: per.toFixed(2) });
+      inserted.push({ 
+        name: `${player.first_name} ${player.last_name}`, 
+        net_rating: netRating?.toFixed(2) || 'N/A' 
+      });
     } catch (err) {
       console.error(`Failed for player ID ${id}:`, err.message);
     }

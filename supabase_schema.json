@@ -21,6 +21,167 @@
       ]
     },
     {
+      "name": "players",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary_key": true
+        },
+        {
+          "name": "first_name",
+          "type": "text"
+        },
+        {
+          "name": "last_name",
+          "type": "text"
+        },
+        {
+          "name": "team_id",
+          "type": "int"
+        },
+        {
+          "name": "team_name",
+          "type": "text"
+        },
+        {
+          "name": "team_abbreviation",
+          "type": "text"
+        },
+        {
+          "name": "position",
+          "type": "text"
+        },
+        {
+          "name": "height",
+          "type": "text"
+        },
+        {
+          "name": "weight",
+          "type": "text"
+        },
+        {
+          "name": "jersey_number",
+          "type": "text"
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "default": true
+        },
+        {
+          "name": "last_updated",
+          "type": "timestamp",
+          "default": "now()"
+        }
+      ],
+      "indices": [
+        {
+          "name": "players_name_idx",
+          "columns": ["first_name", "last_name"]
+        },
+        {
+          "name": "players_team_idx",
+          "columns": ["team_id"]
+        }
+      ]
+    },
+    {
+      "name": "player_cache",
+      "columns": [
+        {
+          "name": "player_id",
+          "type": "int",
+          "primary_key": true,
+          "references": "players(id)"
+        },
+        {
+          "name": "player",
+          "type": "jsonb"
+        },
+        {
+          "name": "advanced_stats",
+          "type": "jsonb"
+        },
+        {
+          "name": "season_averages",
+          "type": "jsonb"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp",
+          "default": "now()"
+        },
+        {
+          "name": "cache_version",
+          "type": "int",
+          "default": 1
+        }
+      ],
+      "indices": [
+        {
+          "name": "player_cache_updated_at_idx",
+          "columns": ["updated_at"]
+        }
+      ],
+      "foreign_keys": [
+        {
+          "columns": ["player_id"],
+          "references": "players(id)",
+          "on_delete": "CASCADE"
+        }
+      ]
+    },
+    {
+      "name": "player_stats_history",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "primary_key": true
+        },
+        {
+          "name": "player_id",
+          "type": "int",
+          "references": "players(id)"
+        },
+        {
+          "name": "season",
+          "type": "int"
+        },
+        {
+          "name": "net_rating",
+          "type": "float"
+        },
+        {
+          "name": "games_played",
+          "type": "int"
+        },
+        {
+          "name": "minutes_played",
+          "type": "float"
+        },
+        {
+          "name": "recorded_at",
+          "type": "timestamp",
+          "default": "now()"
+        }
+      ],
+      "indices": [
+        {
+          "name": "player_stats_history_player_season_idx",
+          "columns": ["player_id", "season"]
+        }
+      ],
+      "foreign_keys": [
+        {
+          "columns": ["player_id"],
+          "references": "players(id)",
+          "on_delete": "CASCADE"
+        }
+      ]
+    },
+    {
       "name": "picks",
       "columns": [
         {
@@ -35,19 +196,13 @@
         },
         {
           "name": "player_id",
-          "type": "int"
-        },
-        {
-          "name": "player_name",
-          "type": "text"
-        },
-        {
-          "name": "nickname",
-          "type": "text"
+          "type": "int",
+          "references": "players(id)"
         },
         {
           "name": "selection",
-          "type": "text"
+          "type": "text",
+          "check": "selection IN ('in', 'out')"
         },
         {
           "name": "selection_date",
@@ -55,12 +210,39 @@
           "default": "now()"
         },
         {
-          "name": "initial_per",
+          "name": "initial_net_rating",
           "type": "float"
         },
         {
-          "name": "career_per",
-          "type": "float"
+          "name": "season",
+          "type": "int"
+        }
+      ],
+      "indices": [
+        {
+          "name": "picks_user_id_idx",
+          "columns": ["user_id"]
+        },
+        {
+          "name": "picks_player_id_idx",
+          "columns": ["player_id"]
+        },
+        {
+          "name": "picks_user_player_season_idx",
+          "columns": ["user_id", "player_id", "season"],
+          "unique": true
+        }
+      ],
+      "foreign_keys": [
+        {
+          "columns": ["user_id"],
+          "references": "users(id)",
+          "on_delete": "CASCADE"
+        },
+        {
+          "columns": ["player_id"],
+          "references": "players(id)",
+          "on_delete": "CASCADE"
         }
       ]
     }
