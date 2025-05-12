@@ -7,6 +7,7 @@ import 'swiper/css';
 import api from '../lib/bdlClient';
 import Layout from '../components/Layout';
 import JerseyAvatar from '../components/JerseyAvatar';
+import ErrorBoundary from '../components/ErrorBoundary';
 import { trackComponentRender } from '../utils/performance';
 import { teams } from '../config/teams';
 
