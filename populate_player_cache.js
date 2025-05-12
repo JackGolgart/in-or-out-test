@@ -1,12 +1,14 @@
+require('dotenv').config();
+
 import { supabase } from "./lib/supabase.js";
 import { batchUpdatePlayerCache, cleanupOldCache } from "./lib/playerCache.js";
 import fetch from "node-fetch";
 
-const BASE_URL = "https://api.balldontlie.io/v1";
-const API_KEY = "c81d57c3-85f8-40f2-ad5b-0c268c0220a0";
-const MAX_PAGES = 6;
+const BASE_URL = "https://api.balldontlie.io/v2";
+const API_KEY = process.env.BALLDONTLIE_API_KEY;
+const MAX_PAGES = 50;
 const BATCH_SIZE = 5;
-const RATE_LIMIT_DELAY = 200;
+const RATE_LIMIT_DELAY = 1000; // 1 second delay between requests
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));

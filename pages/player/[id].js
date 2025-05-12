@@ -125,9 +125,9 @@ export async function getStaticProps({ params }) {
   const { id } = params;
 
   try {
-    const res = await fetch(`https://api.balldontlie.io/v1/players/${id}`, {
+    const res = await fetch(`https://api.balldontlie.io/v2/players/${id}`, {
       headers: {
-        Authorization: 'Bearer c81d57c3-85f8-40f2-ad5b-0c268c0220a0',
+        Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
       },
     });
 

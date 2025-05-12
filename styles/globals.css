@@ -1,3 +1,117 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --header-height: 72px;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-gray-900 text-white antialiased;
+  }
+
+  /* Focus styles */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-purple-500 ring-offset-2 ring-offset-gray-900;
+  }
+}
+
+@layer utilities {
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.1) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+  }
+}
+
+@layer components {
+  .hover-shadow-glow {
+    @apply transition-all duration-300;
+  }
+  .hover-shadow-glow:hover {
+    box-shadow: 0 0 20px rgba(147, 51, 234, 0.3);
+  }
+  
+  .card-hover {
+    @apply transform transition-all duration-300 hover:scale-105;
+  }
+  
+  .input-primary {
+    @apply w-full px-6 py-3 rounded-xl border border-gray-600 bg-gray-800/50 text-white placeholder-gray-400 
+           focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300;
+  }
+  
+  .btn-primary {
+    @apply px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 
+           transform transition-all duration-300 hover:shadow-glow focus:outline-none 
+           focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50 disabled:opacity-50 
+           disabled:cursor-not-allowed disabled:hover:bg-purple-600 disabled:hover:shadow-none;
+  }
+  
+  .btn-secondary {
+    @apply px-6 py-3 bg-gray-700 text-white rounded-xl hover:bg-gray-600 
+           transform transition-all duration-300 focus:outline-none 
+           focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 disabled:opacity-50 
+           disabled:cursor-not-allowed disabled:hover:bg-gray-700;
+  }
+
+  /* Card animations */
+  .card-enter {
+    @apply opacity-0 translate-y-4;
+  }
+  .card-enter-active {
+    @apply opacity-100 translate-y-0 transition-all duration-300;
+  }
+  .card-exit {
+    @apply opacity-100;
+  }
+  .card-exit-active {
+    @apply opacity-0 translate-y-4 transition-all duration-300;
+  }
+
+  /* Loading animations */
+  .loading-dot {
+    @apply w-2 h-2 bg-purple-500 rounded-full;
+    animation: loading 1s infinite;
+  }
+  .loading-dot:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+  .loading-dot:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+}
+
+@keyframes loading {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}

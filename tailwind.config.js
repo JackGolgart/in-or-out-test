@@ -9,8 +9,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        'gray-750': '#2D3748',
-        'gray-850': '#1A202C',
+        'gray-750': '#2d374d',
+        'gray-850': '#1a2234',
       },
       animation: {
         'slide-down': 'slideDown 0.3s ease-out forwards',
@@ -27,10 +27,16 @@ module.exports = {
           '0%': { opacity: 0 },
           '100%': { opacity: 1 },
         },
+        shimmer: {
+          '100%': {
+            transform: 'translateX(100%)',
+          },
+        },
       },
       boxShadow: {
         'inner-lg': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.15)',
-        'glow': '0 0 15px rgba(147, 51, 234, 0.3)',
+        'glow': '0 0 15px rgba(147, 51, 234, 0.35)',
+        'glow-lg': '0 0 25px rgba(147, 51, 234, 0.5)',
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
@@ -46,7 +52,13 @@ module.exports = {
       transitionTimingFunction: {
         'bounce-in': 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
       },
+      transitionProperty: {
+        'height': 'height',
+        'spacing': 'margin, padding',
+      },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/forms'),
+  ],
 }

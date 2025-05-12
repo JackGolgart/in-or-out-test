@@ -1,8 +1,8 @@
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
-  'https://ofyxpiqpcomlxfdyswkv.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9meXhwaXFwY29tbHhmZHlzd2t2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NTk1NDgxOCwiZXhwIjoyMDYxNTMwODE4fQ.QqvGLhazUEJUHqoln81fZRWqqEFfAcCyrIM4YX5CWek'
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));

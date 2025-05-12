@@ -1,13 +1,13 @@
 export default async function handler(req, res) {
   const { id } = req.query;
-  const apiKey = 'c81d57c3-85f8-40f2-ad5b-0c268c0220a0';
+  const apiKey = process.env.BALLDONTLIE_API_KEY;
   const seasons = [2018, 2019, 2020, 2021, 2022, 2023];
   const history = [];
 
   for (let season of seasons) {
     try {
       const advancedStatsRes = await fetch(
-        `https://api.balldontlie.io/v1/stats/advanced?player_ids[]=${id}&seasons[]=${season}&per_page=100`,
+        `https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${id}&seasons[]=${season}&per_page=100`,
         {
           headers: {
             Authorization: `Bearer ${apiKey}`,

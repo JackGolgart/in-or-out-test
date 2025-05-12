@@ -20,9 +20,9 @@ export default async function handler(req, res) {
     // If not in cache, fetch fresh data
     const [playerRes, advancedStatsRes, seasonAveragesRes] = await Promise.all([
       api.nba.getPlayers({ search: id }),
-      fetch(`https://api.balldontlie.io/v1/stats/advanced?player_ids[]=${id}`, {
+      fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${id}`, {
         headers: {
-          Authorization: `Bearer c81d57c3-85f8-40f2-ad5b-0c268c0220a0`,
+          Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
         },
       }),
       api.nba.getSeasonAverages({
