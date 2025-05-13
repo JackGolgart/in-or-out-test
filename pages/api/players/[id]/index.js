@@ -47,7 +47,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Invalid player data format' });
     }
 
-    const player = playerRes.data[0];
+    let player = playerRes.data[0];
     if (!player) {
       console.error('Player not found:', id, 'Response:', playerRes);
       // Try fetching with search as fallback
