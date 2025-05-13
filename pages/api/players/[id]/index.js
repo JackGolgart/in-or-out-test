@@ -40,7 +40,11 @@ export default async function handler(req, res) {
     }
 
     const player = playersResponse.data[0];
-    console.log('Found player:', player.first_name, player.last_name);
+    console.log('Found player:', {
+      id: player.id,
+      name: `${player.first_name} ${player.last_name}`,
+      initialTeam: player.team?.full_name
+    });
 
     // Get the player's most recent game to determine current team
     console.log('Fetching most recent game for team info');
@@ -54,10 +58,23 @@ export default async function handler(req, res) {
     // Update team information if we have recent game data
     if (recentStatsResponse?.data?.length > 0) {
       const recentGame = recentStatsResponse.data[0];
+      console.log('Recent game data:', {
+        date: recentGame.game.date,
+        team: recentGame.team?.full_name,
+        opponent: recentGame.game.home_team_id === recentGame.team.id ? 
+          'vs ' + recentGame.game.visitor_team_id : 
+          'at ' + recentGame.game.home_team_id
+      });
+
       if (recentGame.team) {
-        console.log('Updating team info from recent game:', recentGame.team.full_name);
+        console.log('Updating team info from recent game:', {
+          oldTeam: player.team?.full_name,
+          newTeam: recentGame.team.full_name
+        });
         player.team = recentGame.team;
       }
+    } else {
+      console.log('No recent games found for team update');
     }
 
     // Get all player stats for the current season
@@ -85,6 +102,13 @@ export default async function handler(req, res) {
         assists: stats.reduce((sum, game) => sum + (game.ast || 0), 0) / totalGames,
         games_played: totalGames
       };
+
+      console.log('Calculated season averages:', {
+        games: totalGames,
+        points: seasonAverages.points.toFixed(1),
+        rebounds: seasonAverages.rebounds.toFixed(1),
+        assists: seasonAverages.assists.toFixed(1)
+      });
     }
 
     // Get recent games (last 5)
@@ -99,6 +123,14 @@ export default async function handler(req, res) {
       result: game.game.home_team_score > game.game.visitor_team_score ? 'W' : 'L',
       score: `${game.game.home_team_score}-${game.game.visitor_team_score}`
     })) || [];
+
+    console.log('Final player data:', {
+      id: player.id,
+      name: `${player.first_name} ${player.last_name}`,
+      team: player.team?.full_name,
+      games: seasonAverages.games_played,
+      recentGames: recentGames.length
+    });
 
     return res.status(200).json({
       player: {
