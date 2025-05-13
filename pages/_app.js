@@ -8,6 +8,8 @@ function MyApp({ Component, pageProps }) {
       <Head>
         <title>NBA Picks</title>
         <link rel="icon" href="/basketball.svg" type="image/svg+xml" />
+        <link rel="alternate icon" href="/basketball.svg" />
+        <meta name="theme-color" content="#000000" />
       </Head>
       <Component {...pageProps} />
     </AuthProvider>
