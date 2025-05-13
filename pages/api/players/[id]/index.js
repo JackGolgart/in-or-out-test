@@ -39,6 +39,8 @@ export default async function handler(req, res) {
     }
 
     const player = playerRes.data;
+    console.log('Found player from API:', { id: player.id, name: `${player.first_name} ${player.last_name}` });
+
     const currentSeason = getCurrentNBASeason();
 
     // Get season averages
@@ -49,6 +51,9 @@ export default async function handler(req, res) {
         seasons: [currentSeason]
       });
       seasonAverages = averages.data?.[0] || null;
+      if (seasonAverages) {
+        console.log('Found season averages for player:', { id, season: currentSeason });
+      }
     } catch (error) {
       console.error('Error fetching season averages:', error);
     }
