@@ -16,6 +16,7 @@ export default function PlayerProfile() {
   const [gameStats, setGameStats] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [playerHistory, setPlayerHistory] = useState([]);
 
   useEffect(() => {
     const fetchPlayerData = async () => {
@@ -24,13 +25,22 @@ export default function PlayerProfile() {
       setError(null);
       
       try {
-        // Fetch player details
-        const playerRes = await api.nba.getPlayers({ per_page: 1, search: id });
+        // Fetch player details and history
+        const [playerRes, historyRes] = await Promise.all([
+          api.nba.getPlayers({ per_page: 1, search: id }),
+          fetch(`/api/player-history/${id}`)
+        ]);
+
         if (!playerRes.data?.[0]) {
           throw new Error('Player not found');
         }
         const playerData = playerRes.data[0];
         setPlayer(playerData);
+
+        const history = await historyRes.json();
+        if (history.length > 0) {
+          setPlayerHistory(history);
+        }
 
         // Fetch player stats and advanced stats
         const [statsRes, advancedStatsRes] = await Promise.all([
