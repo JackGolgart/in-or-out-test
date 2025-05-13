@@ -1,4 +1,4 @@
-import { getPlayers } from '../../../lib/bdlClient';
+import api from '../../../lib/bdlClient';
 
 const handler = async (req, res) => {
   // Add CORS headers
@@ -29,7 +29,7 @@ const handler = async (req, res) => {
       headers: req.headers
     });
 
-    const { query: search, page = '1', per_page = '25' } = req.query;
+    const { search, page = '1', per_page = '25' } = req.query;
 
     // Validate input parameters
     const parsedPage = parseInt(page);
@@ -58,20 +58,57 @@ const handler = async (req, res) => {
       search: search || ''
     });
 
-    const response = await getPlayers({ 
+    const response = await api.getPlayers({ 
       page: parsedPage,
       per_page: parsedPerPage,
       search: search || ''
+    });
+
+    const players = Array.isArray(response.data) ? response.data : [];
+
+    if (players.length === 0) {
+      return res.status(200).json({ data: [], meta: response.meta });
+    }
+
+    // Fetch advanced stats for NET rating
+    const ids = players.map(p => p.id);
+    const advancedStatsRes = await fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${ids.join(',')}`, {
+      headers: {
+        Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
+      },
+    });
+
+    if (!advancedStatsRes.ok) {
+      console.error('Advanced stats fetch failed:', advancedStatsRes.status);
+      // Return players without advanced stats rather than failing completely
+      return res.status(200).json({
+        data: players.map(player => ({ ...player, net_rating: null })),
+        meta: response.meta
+      });
+    }
+
+    const advancedStats = await advancedStatsRes.json();
+
+    const playersWithNetRating = players.map(player => {
+      const stats = advancedStats.data.find(stat => stat.player.id === player.id);
+      return {
+        ...player,
+        net_rating: stats?.net_rating ?? null,
+      };
     });
 
     // Log successful response
     console.log('API Response success:', {
       total: response.meta?.total_count,
       current_page: response.meta?.current_page,
-      per_page: response.meta?.per_page
+      per_page: response.meta?.per_page,
+      players_with_ratings: playersWithNetRating.length
     });
 
-    return res.status(200).json(response);
+    return res.status(200).json({
+      data: playersWithNetRating,
+      meta: response.meta
+    });
   } catch (error) {
     // Log the full error details
     console.error('API Error:', {

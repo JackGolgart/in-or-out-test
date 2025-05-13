@@ -13,15 +13,23 @@ import { trackComponentRender } from '../utils/performance';
 import { teams } from '../config/teams';
 
 const SearchSection = ({ query, setQuery, searchMessage }) => (
-  <div className="bg-gray-900/50 border-b border-gray-800 sticky top-[72px] z-10 backdrop-blur-sm">
-    <div className="max-w-7xl mx-auto px-4 py-3">
-      <div className="flex items-center">
-        <div className="flex-1 max-w-xl">
+  <div className="bg-gray-900/50 border-b border-gray-800 sticky top-[64px] z-10 backdrop-blur-sm">
+    <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="flex flex-col space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-white">Search Players</h2>
+        </div>
+        <div className="flex-1 max-w-2xl">
           <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
             <input
               type="text"
-              className="w-full bg-gray-800/50 border border-gray-700 rounded-lg py-2 px-4 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-              placeholder="Search players..."
+              className="w-full bg-gray-800/50 border border-gray-700 rounded-lg py-3 pl-10 pr-4 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+              placeholder="Search by player name (e.g., Luka, James)..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoComplete="off"
@@ -31,17 +39,17 @@ const SearchSection = ({ query, setQuery, searchMessage }) => (
             {query && (
               <button
                 onClick={() => setQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white"
                 aria-label="Clear search"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             )}
           </div>
           {searchMessage && (
-            <p className="text-xs text-gray-500 mt-1 ml-1">{searchMessage}</p>
+            <p className="text-xs text-gray-500 mt-2 ml-1">{searchMessage}</p>
           )}
         </div>
       </div>
@@ -71,7 +79,7 @@ const PlayerCard = ({ player, onClick }) => (
       </div>
       <div className="text-right">
         <div className="text-purple-400 text-sm font-medium">
-          {player.netRating !== null ? player.netRating.toFixed(1) : 'N/A'}
+          {player.net_rating !== null ? player.net_rating.toFixed(1) : 'N/A'}
         </div>
         <p className="text-gray-500 text-xs">NET</p>
       </div>
