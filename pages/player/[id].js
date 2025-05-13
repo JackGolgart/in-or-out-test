@@ -205,7 +205,7 @@ export async function getServerSideProps({ params }) {
     const { id } = params;
     
     // Fetch player data from our API endpoint
-    const playerRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/player/${id}`);
+    const playerRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/players/${id}`);
     if (!playerRes.ok) {
       const error = await playerRes.json();
       console.error('Player API error:', error);
