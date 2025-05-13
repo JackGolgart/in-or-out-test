@@ -54,30 +54,33 @@ async function fetchPlayerStats(api, playerId) {
     const currentSeason = getCurrentNBASeason();
     console.log(`Fetching stats for player ${playerId} for season ${currentSeason}`);
     
-    const stats = await api.nba.getPlayerStats({
-      player_ids: [playerId],
-      seasons: [currentSeason]  // Dynamically set current season
-    });
+    // Fetch both regular stats and advanced stats
+    const [regularStats, advancedStats] = await Promise.all([
+      api.nba.getPlayerStats({
+        player_ids: [playerId],
+        seasons: [currentSeason]
+      }),
+      fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${playerId}&seasons[]=${currentSeason}&per_page=100`, {
+        headers: {
+          Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
+        },
+      }).then(res => res.json())
+    ]);
 
-    if (!stats || !stats.data || stats.data.length === 0) {
+    if (!regularStats?.data?.[0]) {
       return null;
     }
 
-    const playerStats = stats.data[0];
+    const playerStats = regularStats.data[0];
+    const advancedStatsData = advancedStats.data?.[0];
     
-    // Calculate NET rating
-    // NET rating = (Offensive Rating - Defensive Rating)
-    const netRating = playerStats.offensive_rating 
-      ? (playerStats.offensive_rating - playerStats.defensive_rating)
-      : null;
-
     return {
-      net_rating: netRating,
+      net_rating: advancedStatsData?.net_rating || null,
       pts: playerStats.pts,
       reb: playerStats.reb,
       ast: playerStats.ast,
       games_played: playerStats.games_played,
-      season: currentSeason // Include the season in the response
+      season: currentSeason
     };
   } catch (error) {
     console.error(`Error fetching stats for player ${playerId}:`, error);
