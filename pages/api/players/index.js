@@ -24,6 +24,15 @@ const handler = async (req, res) => {
   console.log('Calling getPlayers with params:', { page, per_page, search });
 
   try {
+    // Check if API key is set
+    if (!process.env.BALLDONTLIE_API_KEY) {
+      console.error('BALLDONTLIE_API_KEY is not set in environment variables');
+      return res.status(500).json({
+        error: 'API configuration error',
+        details: 'API key is not configured'
+      });
+    }
+
     const apiInstance = initializeApi();
     console.log('API initialized successfully');
 
@@ -107,10 +116,17 @@ const handler = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error in players API:', error);
+    console.error('Error in players API:', {
+      message: error.message,
+      stack: error.stack,
+      params: { page, per_page, search }
+    });
+    
     return res.status(500).json({ 
       error: 'Failed to fetch players',
-      details: error.message 
+      details: error.message,
+      type: error.name,
+      params: { page, per_page, search }
     });
   }
 };
