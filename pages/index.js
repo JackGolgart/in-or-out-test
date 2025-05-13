@@ -10,7 +10,6 @@ import JerseyAvatar from '../components/JerseyAvatar';
 import ErrorBoundary from '../components/ErrorBoundary';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { trackComponentRender } from '../utils/performance';
-import { teams } from '../config/teams';
 
 const SearchSection = ({ query, setQuery, searchMessage }) => (
   <div className="bg-gray-900/80 border-b border-gray-800 sticky top-16 z-10 backdrop-blur-sm">
