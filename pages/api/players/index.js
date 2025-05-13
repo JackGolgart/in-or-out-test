@@ -139,13 +139,15 @@ const handler = async (req, res) => {
 
   try {
     const { page = 1, per_page = 25, search = '' } = req.query;
+    const currentSeason = getCurrentNBASeason();
 
     // Debug: Log environment variables
     console.log('Environment check:', {
       hasApiKey: !!process.env.BALLDONTLIE_API_KEY,
       apiKeyLength: process.env.BALLDONTLIE_API_KEY?.length,
       env: process.env.NODE_ENV,
-      envVars: Object.keys(process.env).filter(key => key.includes('BALL'))
+      envVars: Object.keys(process.env).filter(key => key.includes('BALL')),
+      currentSeason
     });
 
     // Initialize API client
@@ -199,8 +201,15 @@ const handler = async (req, res) => {
       })
     );
 
+    // Filter out players without current season stats
+    const activePlayers = playersWithStats.filter(player => 
+      player && 
+      player.games_played > 0 && 
+      player.season === currentSeason
+    );
+
     // Ensure each player's team is a valid object
-    const normalizedPlayers = playersWithStats.map(player => {
+    const normalizedPlayers = activePlayers.map(player => {
       if (!player || typeof player !== 'object') return player;
       let team = player.team;
       if (!team || typeof team !== 'object') {
@@ -233,7 +242,11 @@ const handler = async (req, res) => {
     // Send final response
     return res.status(200).json({
       data: validPlayers,
-      meta: response.meta
+      meta: {
+        ...response.meta,
+        total_count: validPlayers.length,
+        total_pages: Math.ceil(validPlayers.length / parseInt(per_page))
+      }
     });
 
   } catch (error) {
