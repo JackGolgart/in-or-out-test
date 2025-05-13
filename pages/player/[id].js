@@ -207,11 +207,15 @@ export async function getServerSideProps({ params }) {
     
     // Fetch player details and history
     const [playerRes, historyRes] = await Promise.all([
-      api.nba.getPlayers({ per_page: 1, search: id }),
+      api.nba.getPlayers({ 
+        player_ids: [parseInt(id)],
+        per_page: 1
+      }),
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/players/${id}/history`)
     ]);
 
     if (!playerRes.data?.[0]) {
+      console.error('Player not found:', { id, response: playerRes });
       return {
         props: {
           error: 'Player not found',
@@ -229,7 +233,7 @@ export async function getServerSideProps({ params }) {
     // Fetch player stats and advanced stats
     const [statsRes, advancedStatsRes] = await Promise.all([
       api.nba.getStats({ 
-        player_ids: [id],
+        player_ids: [parseInt(id)],
         seasons: [currentSeason],
         per_page: 100
       }),
@@ -276,7 +280,13 @@ export async function getServerSideProps({ params }) {
   } catch (error) {
     console.error('Error fetching player data:', error);
     return {
-      notFound: true
+      props: {
+        error: 'Failed to load player data',
+        player: null,
+        stats: null,
+        gameStats: [],
+        playerHistory: []
+      }
     };
   }
 }
