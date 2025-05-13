@@ -64,17 +64,6 @@ const handler = async (req, res) => {
   try {
     const { page = 1, per_page = 25, search = '' } = req.query;
 
-    // Validate API key
-    const apiKey = process.env.BALLDONTLIE_API_KEY;
-    if (!apiKey) {
-      console.error('API key missing in environment:', {
-        env: process.env.NODE_ENV,
-        hasKey: !!apiKey,
-        envVars: Object.keys(process.env).filter(key => key.includes('BALL')),
-      });
-      return errorHandler(res, 401, 'API key not configured');
-    }
-
     // Initialize API client
     let apiInstance;
     try {
@@ -84,36 +73,19 @@ const handler = async (req, res) => {
         throw new Error('Failed to initialize API client');
       }
     } catch (initError) {
-      console.error('API initialization error:', {
-        error: initError,
-        hasKey: !!apiKey,
-        keyLength: apiKey?.length,
-      });
+      console.error('API initialization error:', initError);
       return errorHandler(res, 500, 'Failed to initialize API client');
     }
 
-    // Fetch players with direct API call for better error handling
-    const playersResponse = await fetch(
-      `https://api.balldontlie.io/v2/players?page=${Math.max(1, parseInt(page))}&per_page=${Math.min(100, Math.max(1, parseInt(per_page)))}&search=${search}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    if (!playersResponse.ok) {
-      const errorText = await playersResponse.text();
-      console.error('Ball Don\'t Lie API error:', {
-        status: playersResponse.status,
-        statusText: playersResponse.statusText,
-        error: errorText,
-      });
-      return errorHandler(res, playersResponse.status, `API Error: ${errorText}`);
-    }
-
-    const response = await playersResponse.json();
+    // Use the SDK to fetch players
+    const response = await apiInstance.nba.getPlayers({
+      page: Math.max(1, parseInt(page)),
+      per_page: Math.min(100, Math.max(1, parseInt(per_page))),
+      ...(search && { search: search.trim() })
+    }).catch(error => {
+      console.error('SDK Error:', error);
+      throw error;
+    });
 
     if (!response || !response.data) {
       return errorHandler(res, 500, 'Invalid API response format');
@@ -132,7 +104,7 @@ const handler = async (req, res) => {
 
   } catch (error) {
     console.error('Unhandled API error:', error);
-    return errorHandler(res, 500, error);
+    return errorHandler(res, 500, error.message || 'Failed to fetch players');
   }
 };
 
