@@ -40,8 +40,15 @@ export default async function handler(req, res) {
     // First, get the player's basic information
     console.log('Fetching player data for ID:', id);
     const playersResponse = await apiInstance.nba.getPlayers({
-      player_ids: [id],
+      player_ids: [parseInt(id)],
       per_page: 1
+    }).catch(error => {
+      console.error('Error fetching player data:', {
+        error: error.message,
+        playerId: id,
+        apiVersion: 'v1'
+      });
+      throw error;
     });
 
     if (!playersResponse?.data?.length) {
@@ -57,11 +64,20 @@ export default async function handler(req, res) {
     });
 
     // Get all stats for the requested season (max 100 games)
+    console.log('Fetching stats for season:', requestedSeason);
     const statsResponse = await apiInstance.nba.getStats({
-      player_ids: [id],
+      player_ids: [parseInt(id)],
       seasons: [requestedSeason],
       per_page: 100,
       sort: ['-game.date']
+    }).catch(error => {
+      console.error('Error fetching player stats:', {
+        error: error.message,
+        playerId: id,
+        season: requestedSeason,
+        apiVersion: 'v1'
+      });
+      throw error;
     });
     const allGames = statsResponse?.data || [];
 
@@ -139,7 +155,18 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('Error in player detail API:', error);
-    return res.status(500).json({ error: 'Failed to fetch player data' });
+    console.error('Error in player detail API:', {
+      message: error.message,
+      stack: error.stack,
+      playerId: id,
+      season: requestedSeason
+    });
+    
+    // Return more specific error information
+    return res.status(500).json({ 
+      error: 'Failed to fetch player data',
+      details: error.message,
+      playerId: id
+    });
   }
 } 

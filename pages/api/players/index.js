@@ -268,7 +268,8 @@ const handler = async (req, res) => {
         try {
           console.log(`Fetching stats for player ${player.id} for season ${currentSeason}`);
           
-          // First get most recent game to determine current team
+          // Get the player's most recent game to determine current team
+          console.log('Fetching most recent game for team info');
           const recentStatsResponse = await apiInstance.nba.getStats({
             player_ids: [player.id],
             seasons: [currentSeason],
@@ -276,14 +277,26 @@ const handler = async (req, res) => {
             sort: ['-game.date']
           });
 
-          // Update player's team if they have recent games
-          if (recentStatsResponse?.data?.[0]?.team) {
-            player.team = recentStatsResponse.data[0].team;
-            console.log('Updated player team:', {
-              id: player.id,
-              name: `${player.first_name} ${player.last_name}`,
-              team: player.team.full_name
+          // Update team information if we have recent game data
+          if (recentStatsResponse?.data?.length > 0) {
+            const recentGame = recentStatsResponse.data[0];
+            console.log('Recent game data:', {
+              date: recentGame.game.date,
+              team: recentGame.team?.full_name,
+              opponent: recentGame.game.home_team_id === recentGame.team.id ? 
+                'vs ' + recentGame.game.visitor_team_id : 
+                'at ' + recentGame.game.home_team_id
             });
+
+            if (recentGame.team) {
+              console.log('Updating team info from recent game:', {
+                oldTeam: player.team?.full_name,
+                newTeam: recentGame.team.full_name
+              });
+              player.team = recentGame.team;
+            }
+          } else {
+            console.log('No recent games found for team update');
           }
 
           // Then get all stats for season averages
