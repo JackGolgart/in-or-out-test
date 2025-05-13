@@ -9,75 +9,48 @@ export default async function handler(req, res) {
     // Try to get from cache first
     const cachedData = await getPlayerFromCache(id);
     if (cachedData) {
+      console.log('Returning cached player data for ID:', id);
       return res.status(200).json({
         player: cachedData.player,
-        advancedStats: cachedData.advancedStats,
         seasonAverages: cachedData.seasonAverages,
         isCached: true
       });
     }
 
-    console.log('Fetching player data for ID:', id);
+    console.log('Fetching fresh player data for ID:', id);
 
     // If not in cache, fetch fresh data
-    const [playerRes, advancedStatsRes, seasonAveragesRes] = await Promise.all([
-      api.nba.getPlayer(parseInt(id)),
-      fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${id}`, {
-        headers: {
-          Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
-        },
-      }),
-      api.getPlayerStats(parseInt(id))
-    ]);
-
-    console.log('Player response:', {
-      status: playerRes?.meta?.status,
-      data: playerRes?.data
+    const playerRes = await api.nba.getPlayers({ 
+      player_ids: [parseInt(id)],
+      per_page: 1
     });
 
-    if (!playerRes || !playerRes.data) {
-      console.error('Invalid player response:', playerRes);
-      return res.status(500).json({ error: 'Invalid player data format' });
-    }
-
-    const player = playerRes.data;
-    if (!player) {
-      console.error('Player not found:', id);
+    if (!playerRes?.data?.[0]) {
+      console.error('Player not found in API response:', { id, response: playerRes });
       return res.status(404).json({ error: 'Player not found' });
     }
 
-    let advancedStatsData = null;
-    try {
-      const advancedStats = await advancedStatsRes.json();
-      if (advancedStats.data && Array.isArray(advancedStats.data)) {
-        advancedStatsData = advancedStats.data[0] || null;
-      }
-    } catch (error) {
-      console.error('Error parsing advanced stats:', error);
-    }
+    const player = playerRes.data[0];
+    const currentSeason = getCurrentNBASeason();
 
-    let seasonAverages = null;
-    try {
-      if (seasonAveragesRes.data && Array.isArray(seasonAveragesRes.data)) {
-        seasonAverages = seasonAveragesRes.data[0] || null;
-      }
-    } catch (error) {
-      console.error('Error parsing season averages:', error);
-    }
+    // Get season averages
+    const averages = await api.nba.getSeasonAverages({
+      player_ids: [parseInt(id)],
+      season: currentSeason,
+    });
 
-    // Cache the new data
+    const seasonAverages = averages.data.length > 0 ? averages.data[0] : null;
+
+    // Cache the results
     const newData = {
       player,
-      advancedStats: advancedStatsData,
       seasonAverages
     };
 
     await updatePlayerCache(player.id, newData);
 
-    res.status(200).json({
-      ...newData,
-      isCached: false
-    });
+    console.log('Successfully fetched and cached player data for ID:', id);
+    res.status(200).json(newData);
   } catch (err) {
     console.error('API error:', err);
     res.status(500).json({ error: 'Internal server error' });
