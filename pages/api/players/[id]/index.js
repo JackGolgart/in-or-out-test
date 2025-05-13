@@ -1,5 +1,4 @@
 import api from '../../../../lib/bdlClient';
-import { getPlayerFromCache, updatePlayerCache } from '../../../../lib/playerCache';
 
 // Function to get current NBA season
 function getCurrentNBASeason() {
@@ -13,100 +12,63 @@ function getCurrentNBASeason() {
 }
 
 export default async function handler(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   const { id } = req.query;
-  if (!id) return res.status(400).json({ error: 'Missing player ID' });
+  const currentSeason = getCurrentNBASeason();
 
   try {
-    // Try to get from cache first
-    const cachedData = await getPlayerFromCache(id);
-    if (cachedData) {
-      console.log('Returning cached player data for ID:', id);
-      return res.status(200).json({
-        player: cachedData.player,
-        seasonAverages: cachedData.seasonAverages,
-        isCached: true
-      });
-    }
-
-    console.log('Fetching fresh player data for ID:', id);
-
-    // If not in cache, fetch fresh data using getPlayers with specific ID
-    const playerRes = await api.nba.getPlayers({ 
-      player_ids: [parseInt(id)]
-    });
-
-    console.log('Player API Response:', {
-      status: 'success',
-      hasData: !!playerRes?.data,
-      dataLength: playerRes?.data?.length,
-      firstPlayer: playerRes?.data?.[0]?.id,
-      response: JSON.stringify(playerRes, null, 2)
-    });
-
-    if (!playerRes?.data?.[0]) {
-      console.error('Player not found in API response:', { 
-        id, 
-        response: JSON.stringify(playerRes, null, 2),
-        apiKey: process.env.BALLDONTLIE_API_KEY ? 'Present' : 'Missing'
-      });
+    console.log('Fetching player data for ID:', id);
+    
+    // Fetch player data
+    const playerResponse = await api.nba.getPlayer({ id: parseInt(id) });
+    if (!playerResponse || !playerResponse.data) {
+      console.error('No player data found for ID:', id);
       return res.status(404).json({ error: 'Player not found' });
     }
 
-    const player = playerRes.data[0];
-    console.log('Found player from API:', { id: player.id, name: `${player.first_name} ${player.last_name}` });
+    const player = playerResponse.data;
 
-    const currentSeason = getCurrentNBASeason();
+    // Fetch player stats
+    const statsResponse = await api.nba.getStats({
+      player_ids: [parseInt(id)],
+      seasons: [currentSeason],
+      per_page: 25
+    });
 
-    // Get season averages and advanced stats
+    // Calculate season averages
     let seasonAverages = null;
-    let advancedStats = null;
-    try {
-      const [averages, advancedStatsRes] = await Promise.all([
-        api.nba.getPlayerStats({
-          player_ids: [parseInt(id)],
-          seasons: [currentSeason]
-        }),
-        fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${id}&seasons[]=${currentSeason}&per_page=100`, {
-          headers: {
-            Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
-          },
-        })
-      ]);
-
-      seasonAverages = averages.data?.[0] || null;
-      const advancedStatsData = await advancedStatsRes.json();
-      advancedStats = advancedStatsData.data?.[0] || null;
-
-      if (seasonAverages) {
-        console.log('Found season averages for player:', { id, season: currentSeason });
-      }
-      if (advancedStats) {
-        console.log('Found advanced stats for player:', { id, season: currentSeason, netRating: advancedStats.net_rating });
-      }
-    } catch (error) {
-      console.error('Error fetching player stats:', error);
-    }
-
-    // Combine the stats
-    if (seasonAverages && advancedStats) {
+    if (statsResponse && statsResponse.data && statsResponse.data.length > 0) {
+      const stats = statsResponse.data;
+      const totalGames = stats.length;
+      
       seasonAverages = {
-        ...seasonAverages,
-        net_rating: advancedStats.net_rating
+        games_played: totalGames,
+        pts: (stats.reduce((sum, game) => sum + (game.pts || 0), 0) / totalGames).toFixed(1),
+        reb: (stats.reduce((sum, game) => sum + (game.reb || 0), 0) / totalGames).toFixed(1),
+        ast: (stats.reduce((sum, game) => sum + (game.ast || 0), 0) / totalGames).toFixed(1),
+        min: (stats.reduce((sum, game) => sum + (parseFloat(game.min) || 0), 0) / totalGames).toFixed(1),
+        fg_pct: (stats.reduce((sum, game) => sum + (game.fg_pct || 0), 0) / totalGames).toFixed(3),
+        fg3_pct: (stats.reduce((sum, game) => sum + (game.fg3_pct || 0), 0) / totalGames).toFixed(3),
+        ft_pct: (stats.reduce((sum, game) => sum + (game.ft_pct || 0), 0) / totalGames).toFixed(3),
+        stl: (stats.reduce((sum, game) => sum + (game.stl || 0), 0) / totalGames).toFixed(1),
+        blk: (stats.reduce((sum, game) => sum + (game.blk || 0), 0) / totalGames).toFixed(1),
+        turnover: (stats.reduce((sum, game) => sum + (game.turnover || 0), 0) / totalGames).toFixed(1),
+        pf: (stats.reduce((sum, game) => sum + (game.pf || 0), 0) / totalGames).toFixed(1)
       };
     }
 
-    // Cache the results
-    const newData = {
+    // Return combined data
+    return res.status(200).json({
       player,
-      seasonAverages
-    };
+      seasonAverages,
+      gameStats: statsResponse?.data || []
+    });
 
-    await updatePlayerCache(player.id, newData);
-
-    console.log('Successfully fetched and cached player data for ID:', id);
-    res.status(200).json(newData);
-  } catch (err) {
-    console.error('API error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+  } catch (error) {
+    console.error('Error fetching player data:', error);
+    return res.status(500).json({ error: 'Failed to fetch player data' });
   }
 } 
