@@ -75,7 +75,7 @@ const handler = async (req, res) => {
     // Try direct API call first
     try {
       console.log('Attempting direct API call...');
-      const directResponse = await fetch('https://api.balldontlie.io/v2/players?per_page=1', {
+      const directResponse = await fetch('https://api.balldontlie.io/v1/players?per_page=1', {
         headers: {
           'Authorization': `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
           'Content-Type': 'application/json',
