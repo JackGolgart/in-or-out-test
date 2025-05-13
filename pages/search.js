@@ -5,6 +5,8 @@ import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import JerseyAvatar from '../components/JerseyAvatar';
 import LoadingSpinner from '../components/LoadingSpinner';
+import Link from 'next/link';
+import styles from '../styles/Search.module.css';
 
 const getNetRatingColor = (rating) => {
   if (!rating && rating !== 0) return 'text-gray-400';
@@ -176,11 +178,30 @@ export default function SearchPage() {
                   ))
                 ) : players.length > 0 ? (
                   players.map((player) => (
-                    <PlayerCard
-                      key={player.id}
-                      player={player}
-                      onClick={() => router.push(`/player/${player.id}`)}
-                    />
+                    <div key={player.id} className={styles.playerCard}>
+                      <Link href={`/player/${player.id}`} className={styles.playerLink}>
+                        <div className={styles.playerInfo}>
+                          <h2>{player.first_name} {player.last_name}</h2>
+                          <p>{player.position} - {player.team?.full_name}</p>
+                        </div>
+                        {player.pts !== undefined && (
+                          <div className={styles.stats}>
+                            <div className={styles.stat}>
+                              <span className={styles.statValue}>{player.pts}</span>
+                              <span className={styles.statLabel}>PPG</span>
+                            </div>
+                            <div className={styles.stat}>
+                              <span className={styles.statValue}>{player.reb}</span>
+                              <span className={styles.statLabel}>RPG</span>
+                            </div>
+                            <div className={styles.stat}>
+                              <span className={styles.statValue}>{player.ast}</span>
+                              <span className={styles.statLabel}>APG</span>
+                            </div>
+                          </div>
+                        )}
+                      </Link>
+                    </div>
                   ))
                 ) : (
                   <div className="col-span-full text-center py-12">
