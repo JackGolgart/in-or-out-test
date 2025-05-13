@@ -4,7 +4,7 @@ import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 import 'swiper/css/pagination';
 import { Pagination, Autoplay } from 'swiper/modules';
-import api from '../../lib/bdlClient';
+import { getApiClient } from '../../lib/bdlClient';
 import Layout from '../../components/Layout';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import Link from 'next/link';
@@ -241,7 +241,8 @@ export async function getServerSideProps({ params }) {
 
     // Fetch recent games
     const currentSeason = getCurrentNBASeason();
-    const statsRes = await api.nba.getStats({ 
+    const apiInstance = getApiClient();
+    const statsRes = await apiInstance.nba.getStats({ 
       player_ids: [parseInt(id)],
       seasons: [currentSeason],
       per_page: 10
