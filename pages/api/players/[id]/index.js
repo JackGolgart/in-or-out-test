@@ -6,8 +6,9 @@ function getCurrentNBASeason() {
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth() + 1; // JavaScript months are 0-based
   
-  // If we're in the first half of the year (before July), use previous year as season start
-  return currentMonth < 7 ? currentYear - 1 : currentYear;
+  // NBA season typically starts in October (month 10)
+  // If we're before October, use previous year as the season start
+  return currentMonth < 10 ? currentYear - 1 : currentYear;
 }
 
 export default async function handler(req, res) {
@@ -26,6 +27,7 @@ export default async function handler(req, res) {
   try {
     const apiInstance = getApiClient();
     const currentSeason = getCurrentNBASeason();
+    console.log('Using season:', currentSeason);
 
     // First, get the player's basic information
     console.log('Fetching player data for ID:', id);
