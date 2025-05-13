@@ -19,16 +19,13 @@ export default async function handler(req, res) {
 
     // If not in cache, fetch fresh data
     const [playerRes, advancedStatsRes, seasonAveragesRes] = await Promise.all([
-      api.nba.getPlayers({ search: id }),
+      api.getPlayers({ player_ids: [parseInt(id)] }),
       fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${id}`, {
         headers: {
           Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
         },
       }),
-      api.nba.getSeasonAverages({
-        player_ids: [parseInt(id)],
-        season: 2023,
-      })
+      api.getPlayerStats({ player_ids: [parseInt(id)] })
     ]);
 
     if (!playerRes.data || !Array.isArray(playerRes.data)) {
@@ -36,7 +33,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Invalid player data format' });
     }
 
-    const player = playerRes.data.find(p => String(p.id) === id);
+    const player = playerRes.data[0];
     if (!player) {
       console.error('Player not found:', id);
       return res.status(404).json({ error: 'Player not found' });

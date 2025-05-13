@@ -1,4 +1,4 @@
-import { getClient } from '../../lib/bdlClient';
+import { getTeams } from '../../lib/bdlClient';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -6,8 +6,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const client = await getClient();
-    const teams = await client.teams();
+    const teams = await getTeams();
     
     if (!teams || !Array.isArray(teams)) {
       console.error('Invalid teams response:', teams);
