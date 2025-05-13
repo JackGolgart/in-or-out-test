@@ -17,6 +17,8 @@ export default async function handler(req, res) {
       });
     }
 
+    console.log('Fetching player data for ID:', id);
+
     // If not in cache, fetch fresh data
     const [playerRes, advancedStatsRes, seasonAveragesRes] = await Promise.all([
       api.getPlayers({ player_ids: [parseInt(id)] }),
@@ -28,14 +30,25 @@ export default async function handler(req, res) {
       api.getPlayerStats({ player_ids: [parseInt(id)] })
     ]);
 
-    if (!playerRes.data || !Array.isArray(playerRes.data)) {
+    console.log('Player response:', {
+      status: playerRes?.meta?.status,
+      totalCount: playerRes?.meta?.total_count,
+      dataLength: playerRes?.data?.length
+    });
+
+    if (!playerRes || !playerRes.data) {
       console.error('Invalid player response:', playerRes);
+      return res.status(500).json({ error: 'Invalid player data format' });
+    }
+
+    if (!Array.isArray(playerRes.data)) {
+      console.error('Player data is not an array:', playerRes.data);
       return res.status(500).json({ error: 'Invalid player data format' });
     }
 
     const player = playerRes.data[0];
     if (!player) {
-      console.error('Player not found:', id);
+      console.error('Player not found:', id, 'Response:', playerRes);
       return res.status(404).json({ error: 'Player not found' });
     }
 
