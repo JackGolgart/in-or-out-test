@@ -56,7 +56,8 @@ export default async function handler(req, res) {
         console.log('Search response:', {
           status: searchRes?.meta?.status,
           totalCount: searchRes?.meta?.total_count,
-          dataLength: searchRes?.data?.length
+          dataLength: searchRes?.data?.length,
+          data: searchRes?.data
         });
         
         if (searchRes?.data?.length > 0) {
@@ -70,7 +71,29 @@ export default async function handler(req, res) {
       }
       
       if (!player) {
-        return res.status(404).json({ error: 'Player not found' });
+        // Try one more time with a different search approach
+        try {
+          const searchRes = await api.getPlayers({ search: id.toString(), per_page: 100 });
+          console.log('Extended search response:', {
+            status: searchRes?.meta?.status,
+            totalCount: searchRes?.meta?.total_count,
+            dataLength: searchRes?.data?.length,
+            data: searchRes?.data
+          });
+          
+          if (searchRes?.data?.length > 0) {
+            const foundPlayer = searchRes.data.find(p => p.id === parseInt(id));
+            if (foundPlayer) {
+              player = foundPlayer;
+            }
+          }
+        } catch (extendedSearchError) {
+          console.error('Extended search fallback failed:', extendedSearchError);
+        }
+        
+        if (!player) {
+          return res.status(404).json({ error: 'Player not found' });
+        }
       }
     }
 
