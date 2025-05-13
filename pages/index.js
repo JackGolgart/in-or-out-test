@@ -141,11 +141,12 @@ export default function HomePage() {
       if (query.length > 2) params.append('search', query);
 
       const response = await fetch(`/api/players?${params.toString()}`);
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
+        throw new Error(data.message || `Error: ${response.status}`);
       }
       
-      const data = await response.json();
       if (!data.data) {
         throw new Error('Invalid response format');
       }
@@ -159,7 +160,12 @@ export default function HomePage() {
 
       const updatedPlayers = isLoadMore ? [...players, ...newPlayers] : newPlayers;
       setPlayers(updatedPlayers);
-      localStorage.setItem('cached_players', JSON.stringify(updatedPlayers));
+      
+      // Only cache if we have valid data
+      if (updatedPlayers.length > 0) {
+        localStorage.setItem('cached_players', JSON.stringify(updatedPlayers));
+      }
+      
       setPage(isLoadMore ? page + 1 : 1);
     } catch (err) {
       console.error("Failed to fetch players:", err);
