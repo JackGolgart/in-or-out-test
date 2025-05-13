@@ -1,6 +1,9 @@
 const { initializeApi } = require('../../../lib/bdlClient');
 
 const handler = async (req, res) => {
+  // Ensure we always send JSON responses, even in case of errors
+  res.setHeader('Content-Type', 'application/json');
+
   // Add CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -11,27 +14,26 @@ const handler = async (req, res) => {
   );
 
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).json({ status: 'ok' });
   }
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { page = 1, per_page = 25, search = '' } = req.query;
-
-  console.log('API Request:', {
-    method: req.method,
-    query: req.query,
-    headers: req.headers,
-    env: {
-      hasApiKey: !!process.env.BALLDONTLIE_API_KEY,
-      nodeEnv: process.env.NODE_ENV
-    }
-  });
-
   try {
+    const { page = 1, per_page = 25, search = '' } = req.query;
+
+    console.log('API Request:', {
+      method: req.method,
+      query: req.query,
+      headers: req.headers,
+      env: {
+        hasApiKey: !!process.env.BALLDONTLIE_API_KEY,
+        nodeEnv: process.env.NODE_ENV
+      }
+    });
+
     // Check if API key is set
     if (!process.env.BALLDONTLIE_API_KEY) {
       console.error('BALLDONTLIE_API_KEY is not set in environment variables');
@@ -43,27 +45,46 @@ const handler = async (req, res) => {
     }
 
     console.log('Initializing API client...');
-    const apiInstance = initializeApi();
-    console.log('API initialized successfully');
+    let apiInstance;
+    try {
+      apiInstance = initializeApi();
+      console.log('API initialized successfully');
+    } catch (initError) {
+      console.error('Failed to initialize API:', initError);
+      return res.status(500).json({
+        error: 'API initialization failed',
+        details: initError.message
+      });
+    }
 
     console.log('Fetching players with params:', { page, per_page, search: search || undefined });
 
-    const response = await apiInstance.nba.getPlayers({
-      page: parseInt(page),
-      per_page: parseInt(per_page),
-      ...(search ? { search } : {})
-    }).catch(error => {
-      console.error('NBA API request failed:', {
-        message: error.message,
-        status: error.status,
-        response: error.response
+    let response;
+    try {
+      response = await apiInstance.nba.getPlayers({
+        page: parseInt(page),
+        per_page: parseInt(per_page),
+        ...(search ? { search } : {})
       });
-      throw error;
-    });
+    } catch (apiError) {
+      console.error('NBA API request failed:', {
+        message: apiError.message,
+        status: apiError.status,
+        response: apiError.response
+      });
+      return res.status(500).json({
+        error: 'NBA API request failed',
+        details: apiError.message,
+        params: { page, per_page, search }
+      });
+    }
 
     if (!response || !response.data) {
       console.error('Invalid API response:', response);
-      throw new Error('Invalid API response format');
+      return res.status(500).json({
+        error: 'Invalid API response format',
+        details: 'Response missing data property'
+      });
     }
 
     console.log('Players API response:', {
@@ -88,29 +109,28 @@ const handler = async (req, res) => {
 
     // Fetch advanced stats for NET rating
     const ids = players.map(p => p.id);
-    const advancedStatsRes = await fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${ids.join(',')}&per_page=100`, {
-      headers: {
-        Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
-      },
-    });
-
-    if (!advancedStatsRes.ok) {
-      console.error('Advanced stats fetch failed:', advancedStatsRes.status);
-      // Return players without advanced stats rather than failing completely
-      return res.status(200).json({
-        data: players.map(player => ({ ...player, net_rating: null })),
-        meta: {
-          total_pages: response.meta?.total_pages || 1,
-          current_page: parseInt(page),
-          next_page: parseInt(page) < (response.meta?.total_pages || 1) ? parseInt(page) + 1 : null
-        }
+    let advancedStats = { data: [] };
+    
+    try {
+      const advancedStatsRes = await fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${ids.join(',')}&per_page=100`, {
+        headers: {
+          Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
+        },
       });
+
+      if (!advancedStatsRes.ok) {
+        console.error('Advanced stats fetch failed:', advancedStatsRes.status);
+        // Don't throw, just log and continue with null net_ratings
+      } else {
+        advancedStats = await advancedStatsRes.json();
+      }
+    } catch (statsError) {
+      console.error('Error fetching advanced stats:', statsError);
+      // Don't throw, just log and continue with null net_ratings
     }
 
-    const advancedStats = await advancedStatsRes.json();
-
     const playersWithNetRating = players.map(player => {
-      const stats = advancedStats.data.find(stat => stat.player_id === player.id);
+      const stats = advancedStats.data?.find(stat => stat.player_id === player.id);
       return {
         ...player,
         net_rating: stats?.net_rating ?? null,
@@ -134,27 +154,17 @@ const handler = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error in players API:', {
+    // Catch any unexpected errors and ensure we return valid JSON
+    console.error('Unexpected error in players API:', {
       name: error.name,
       message: error.message,
-      stack: error.stack,
-      params: { page, per_page, search },
-      cause: error.cause
+      stack: error.stack
     });
     
-    // Check if it's an API error with response
-    if (error.response) {
-      console.error('API Error Response:', {
-        status: error.response.status,
-        data: error.response.data
-      });
-    }
-    
     return res.status(500).json({ 
-      error: 'Failed to fetch players',
+      error: 'Internal server error',
       details: error.message,
       type: error.name,
-      params: { page, per_page, search },
       timestamp: new Date().toISOString()
     });
   }
