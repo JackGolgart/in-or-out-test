@@ -54,18 +54,11 @@ async function fetchPlayerStats(api, playerId) {
     const currentSeason = getCurrentNBASeason();
     console.log(`Fetching stats for player ${playerId} for season ${currentSeason}`);
     
-    // Fetch both regular stats and advanced stats
-    const [regularStats, advancedStatsRes] = await Promise.all([
-      api.nba.getPlayerStats({
-        player_ids: [playerId],
-        seasons: [currentSeason]
-      }),
-      fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${playerId}&seasons[]=${currentSeason}&per_page=100`, {
-        headers: {
-          Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
-        },
-      })
-    ]);
+    // Fetch regular stats using v1 API
+    const regularStats = await api.nba.getPlayerStats({
+      player_ids: [playerId],
+      seasons: [currentSeason]
+    });
 
     // Log the responses for debugging
     console.log('Regular stats response:', {
@@ -74,21 +67,37 @@ async function fetchPlayerStats(api, playerId) {
       firstPlayer: regularStats?.data?.[0]?.id
     });
 
-    const advancedStats = await advancedStatsRes.json();
-    console.log('Advanced stats response:', {
-      hasData: !!advancedStats?.data,
-      dataLength: advancedStats?.data?.length,
-      firstPlayer: advancedStats?.data?.[0]?.player_id,
-      netRating: advancedStats?.data?.[0]?.net_rating
-    });
-
     if (!regularStats?.data?.[0]) {
       console.log('No regular stats found for player:', playerId);
       return null;
     }
 
     const playerStats = regularStats.data[0];
-    const advancedStatsData = advancedStats.data?.[0];
+    
+    // Try to fetch advanced stats using v2 API
+    let advancedStatsData = null;
+    try {
+      const advancedStatsRes = await fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${playerId}&seasons[]=${currentSeason}&per_page=100`, {
+        headers: {
+          Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
+        },
+      });
+
+      if (advancedStatsRes.ok) {
+        const advancedStats = await advancedStatsRes.json();
+        advancedStatsData = advancedStats.data?.[0] || null;
+        
+        console.log('Advanced stats response:', {
+          hasData: !!advancedStats?.data,
+          dataLength: advancedStats?.data?.length,
+          firstPlayer: advancedStats?.data?.[0]?.player_id,
+          netRating: advancedStats?.data?.[0]?.net_rating
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching advanced stats:', error);
+      // Continue without advanced stats
+    }
     
     // Log the final stats object
     const stats = {
@@ -155,7 +164,7 @@ const handler = async (req, res) => {
     let apiInstance;
     try {
       console.log('Initializing API client...');
-      apiInstance = initializeApi('v2');
+      apiInstance = initializeApi('v1'); // Use v1 for basic player data
       if (!apiInstance) {
         throw new Error('Failed to initialize API client');
       }
@@ -203,11 +212,20 @@ const handler = async (req, res) => {
 
     const players = response.data;
 
+    // Initialize v2 API for advanced stats
+    let apiV2;
+    try {
+      apiV2 = initializeApi('v2');
+    } catch (error) {
+      console.error('Failed to initialize v2 API for advanced stats:', error);
+      // Continue without advanced stats
+    }
+
     // Fetch stats for each player in parallel
     const playersWithStats = await Promise.all(
       players.map(async (player) => {
         try {
-          const stats = await fetchPlayerStats(apiInstance, player.id);
+          const stats = await fetchPlayerStats(apiV2 || apiInstance, player.id);
           return {
             ...player,
             ...stats
