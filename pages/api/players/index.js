@@ -64,6 +64,14 @@ const handler = async (req, res) => {
   try {
     const { page = 1, per_page = 25, search = '' } = req.query;
 
+    // Debug: Log environment variables
+    console.log('Environment check:', {
+      hasApiKey: !!process.env.BALLDONTLIE_API_KEY,
+      apiKeyLength: process.env.BALLDONTLIE_API_KEY?.length,
+      env: process.env.NODE_ENV,
+      envVars: Object.keys(process.env).filter(key => key.includes('BALL'))
+    });
+
     // Initialize API client
     let apiInstance;
     try {
@@ -74,7 +82,7 @@ const handler = async (req, res) => {
       }
     } catch (initError) {
       console.error('API initialization error:', initError);
-      return errorHandler(res, 500, 'Failed to initialize API client');
+      return errorHandler(res, 500, initError.message || 'Failed to initialize API client');
     }
 
     // Use the SDK to fetch players
