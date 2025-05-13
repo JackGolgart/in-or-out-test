@@ -2,30 +2,20 @@
 
 import React from 'react';
 
-const LoadingSpinner = ({ size = 'md', light = false, message = 'Loading...', className = '' }) => {
+const LoadingSpinner = ({ size = 'md', message }) => {
   const sizeClasses = {
-    sm: 'w-5 h-5',
-    md: 'w-8 h-8',
-    lg: 'w-12 h-12'
+    sm: 'w-4 h-4',
+    md: 'w-5 h-5',
+    lg: 'w-6 h-6'
   };
 
   return (
-    <div className={`flex flex-col items-center justify-center space-y-3 ${className}`}>
-      <div
-        className={`${sizeClasses[size]} animate-spin rounded-full border-4 
-          ${light 
-            ? 'border-white border-t-transparent' 
-            : 'border-purple-600 border-t-transparent'
-          }`}
-        role="status"
-        aria-label="Loading"
-      >
-        <span className="sr-only">{message}</span>
+    <div className="flex flex-col items-center space-y-2">
+      <div className="relative">
+        <div className={`${sizeClasses[size]} border-2 border-purple-500/20 border-t-purple-500 rounded-full animate-spin`}></div>
       </div>
       {message && (
-        <p className={`text-sm ${light ? 'text-white' : 'text-gray-400'}`}>
-          {message}
-        </p>
+        <p className="text-gray-500 text-sm">{message}</p>
       )}
     </div>
   );

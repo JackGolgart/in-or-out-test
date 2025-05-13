@@ -12,66 +12,68 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { trackComponentRender } from '../utils/performance';
 import { teams } from '../config/teams';
 
-const SearchSection = ({ query, setQuery, selectedTeam, setSelectedTeam, searchMessage }) => (
-  <div className="bg-gray-850 border-b border-gray-700 sticky top-[72px] z-10 backdrop-blur-sm bg-opacity-90 transition-all duration-300">
-    <div className="max-w-6xl mx-auto px-4 py-4">
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="flex-1">
-          <div className="relative group">
-            <div className="absolute inset-0 bg-purple-500/20 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition-opacity duration-300"></div>
-            <div className="relative">
-              <input
-                type="text"
-                className="input-primary pr-10"
-                placeholder="Search players by name..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                autoComplete="off"
-                aria-label="Search players"
-                minLength={3}
-              />
-              {query && (
-                <button
-                  onClick={() => setQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors duration-200"
-                  aria-label="Clear search"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-            </div>
+const SearchSection = ({ query, setQuery, searchMessage }) => (
+  <div className="bg-gray-900/50 border-b border-gray-800 sticky top-[72px] z-10 backdrop-blur-sm">
+    <div className="max-w-7xl mx-auto px-4 py-3">
+      <div className="flex items-center">
+        <div className="flex-1 max-w-xl">
+          <div className="relative">
+            <input
+              type="text"
+              className="w-full bg-gray-800/50 border border-gray-700 rounded-lg py-2 px-4 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+              placeholder="Search players..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoComplete="off"
+              aria-label="Search players"
+              minLength={3}
+            />
+            {query && (
+              <button
+                onClick={() => setQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                aria-label="Clear search"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
           {searchMessage && (
-            <p className="text-sm text-gray-400 mt-1 ml-1 transition-all duration-300">{searchMessage}</p>
+            <p className="text-xs text-gray-500 mt-1 ml-1">{searchMessage}</p>
           )}
         </div>
-        <div className="md:w-64">
-          <div className="relative group">
-            <div className="absolute inset-0 bg-purple-500/20 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition-opacity duration-300"></div>
-            <div className="relative">
-              <select
-                value={selectedTeam}
-                onChange={(e) => setSelectedTeam(e.target.value)}
-                className="input-primary appearance-none"
-                aria-label="Filter by team"
-              >
-                <option value="">All Teams</option>
-                {teams.map(team => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          </div>
+      </div>
+    </div>
+  </div>
+);
+
+const PlayerCard = ({ player, onClick }) => (
+  <div 
+    onClick={onClick}
+    className="bg-gray-800/50 rounded-lg p-4 hover:bg-gray-800/70 transition-all cursor-pointer border border-gray-700/50 hover:border-purple-500/50"
+  >
+    <div className="flex items-center space-x-4">
+      <div className="w-12 h-12">
+        <JerseyAvatar
+          teamAbbr={player.team.abbreviation}
+          firstName={player.first_name}
+          lastName={player.last_name}
+          className="w-full h-full"
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <h3 className="text-white text-sm font-medium truncate">
+          {player.first_name} {player.last_name}
+        </h3>
+        <p className="text-gray-400 text-xs truncate">{player.team.full_name}</p>
+      </div>
+      <div className="text-right">
+        <div className="text-purple-400 text-sm font-medium">
+          {player.netRating !== null ? player.netRating.toFixed(1) : 'N/A'}
         </div>
+        <p className="text-gray-500 text-xs">NET</p>
       </div>
     </div>
   </div>
@@ -81,7 +83,6 @@ export default function HomePage() {
   const router = useRouter();
   const [players, setPlayers] = useState([]);
   const [query, setQuery] = useState('');
-  const [selectedTeam, setSelectedTeam] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -109,7 +110,7 @@ export default function HomePage() {
       }
     }, 400);
     return () => clearTimeout(delay);
-  }, [query, selectedTeam]);
+  }, [query]);
 
   useEffect(() => {
     const cached = localStorage.getItem('cached_players');
@@ -132,51 +133,31 @@ export default function HomePage() {
     setIsLoading(true);
     setError(null);
     try {
-      const options = {
-        per_page: 25,
-        page: isLoadMore ? page + 1 : 1,
-      };
-      if (query.length > 2) options.search = query;
-      if (selectedTeam) options.team_ids = [parseInt(selectedTeam)];
-
-      const response = await api.nba.getPlayers(options);
-      if (!response.data) {
-        throw new Error('Invalid response from players API');
-      }
-      const newPlayers = Array.isArray(response.data) ? response.data : [];
-      
-      if (response.meta) {
-        setMeta(response.meta);
-        setHasMore(response.meta.current_page < response.meta.total_pages);
-      }
-
-      const ids = newPlayers.map(p => p.id);
-      const statsRes = await api.nba.getStats({ 
-        player_ids: ids, 
-        seasons: [2023],
-        per_page: 100
+      const params = new URLSearchParams({
+        per_page: '25',
+        page: isLoadMore ? (page + 1).toString() : '1',
       });
       
-      if (!statsRes.data) {
-        throw new Error('Invalid response from stats API');
+      if (query.length > 2) params.append('search', query);
+
+      const response = await fetch(`/api/players?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      if (!data.data) {
+        throw new Error('Invalid response format');
       }
 
-      const statsMap = new Map();
-      statsRes.data.forEach(stat => {
-        if (!statsMap.has(stat.player.id) || new Date(stat.game.date) > new Date(statsMap.get(stat.player.id).game.date)) {
-          statsMap.set(stat.player.id, stat);
-        }
-      });
+      const newPlayers = Array.isArray(data.data) ? data.data : [];
+      
+      if (data.meta) {
+        setMeta(data.meta);
+        setHasMore(data.meta.current_page < data.meta.total_pages);
+      }
 
-      const playerStats = newPlayers.map(player => {
-        const stats = statsMap.get(player.id);
-        return {
-          ...player,
-          netRating: stats?.net_rating ?? null
-        };
-      });
-
-      const updatedPlayers = isLoadMore ? [...players, ...playerStats] : playerStats;
+      const updatedPlayers = isLoadMore ? [...players, ...newPlayers] : newPlayers;
       setPlayers(updatedPlayers);
       localStorage.setItem('cached_players', JSON.stringify(updatedPlayers));
       setPage(isLoadMore ? page + 1 : 1);
@@ -189,48 +170,21 @@ export default function HomePage() {
     }
   };
 
-  const renderPlayerCard = (player) => {
-    if (!player) return null;
-    return (
-      <div className="p-4 bg-gray-800 rounded text-center shadow-md flex flex-col items-center">
-        <div className="mb-2">
-          <JerseyAvatar
-            teamAbbr={player.team.abbreviation}
-            firstName={player.first_name}
-            lastName={player.last_name}
-          />
-        </div>
-        <h3 className="text-white text-lg">{player.first_name} {player.last_name}</h3>
-        <p className="text-gray-400 text-xs">{player.team.full_name}</p>
-        <p className="text-purple-300 text-sm mt-1">NET Rating: {player.netRating !== null ? player.netRating.toFixed(1) : 'N/A'}</p>
-        <p className="text-gray-400 text-xs">Position: {player.position || 'N/A'}</p>
-        <button
-          onClick={() => router.push(`/player/${player.id}`)}
-          className="mt-2 px-4 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700"
-        >
-          View
-        </button>
-      </div>
-    );
-  };
-
   return (
     <Layout>
       <ErrorBoundary>
-        <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-850 to-black">
-          {/* Hero Section */}
-          <div className="relative overflow-hidden bg-gradient-to-r from-blue-900 to-purple-900 py-16">
-            <div className="absolute inset-0">
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/50"></div>
-              <div className="absolute inset-0 bg-[url('/basketball-pattern.svg')] opacity-10"></div>
-            </div>
-            <div className="relative max-w-6xl mx-auto px-4">
-              <h1 className="text-4xl md:text-5xl font-extrabold mb-4 text-white bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-200">
-                NBA Player Stats
-              </h1>
-              <p className="text-lg md:text-xl text-gray-200 max-w-2xl">
-                Track performance, analyze statistics, and discover player ratings in the NBA.
-              </p>
+        <div className="min-h-screen bg-gray-900">
+          {/* Header */}
+          <div className="relative bg-gray-900 border-b border-gray-800">
+            <div className="max-w-7xl mx-auto px-4 py-6">
+              <div className="flex flex-col space-y-2">
+                <h1 className="text-2xl font-bold text-white">
+                  NBA Player Analytics
+                </h1>
+                <p className="text-gray-400 text-sm">
+                  Track performance metrics and discover insights
+                </p>
+              </div>
             </div>
           </div>
 
@@ -238,18 +192,16 @@ export default function HomePage() {
           <SearchSection
             query={query}
             setQuery={setQuery}
-            selectedTeam={selectedTeam}
-            setSelectedTeam={setSelectedTeam}
             searchMessage={searchMessage}
           />
 
           {/* Content Section */}
-          <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="max-w-7xl mx-auto px-4 py-6">
             {error && (
-              <div className="text-center mb-8">
-                <div className="bg-red-900/20 rounded-xl px-6 py-4 inline-block">
-                  <p className="text-red-400 flex items-center">
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="mb-6">
+                <div className="bg-red-900/20 border border-red-800/50 rounded-lg px-4 py-3">
+                  <p className="text-red-400 text-sm flex items-center">
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     {error}
@@ -258,38 +210,44 @@ export default function HomePage() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-              {players.map(player => renderPlayerCard(player))}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {players.map(player => (
+                <PlayerCard
+                  key={player.id}
+                  player={player}
+                  onClick={() => router.push(`/player/${player.id}`)}
+                />
+              ))}
             </div>
 
             {isLoading && (
-              <div className="flex justify-center items-center py-12">
+              <div className="flex justify-center items-center py-8">
                 <LoadingSpinner 
-                  size="lg"
-                  message={players.length > 0 ? "Loading more players..." : "Searching players..."}
+                  size="md"
+                  message={players.length > 0 ? "Loading more..." : "Searching..."}
                 />
               </div>
             )}
 
             {!isLoading && players.length > 0 && hasMore && (
-              <div className="text-center pb-8">
+              <div className="text-center py-6">
                 <button
                   onClick={() => fetchPlayers(true)}
-                  className="btn-primary hover-shadow-glow"
+                  className="bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 text-sm font-medium px-6 py-2 rounded-lg border border-purple-600/30 hover:border-purple-600/50 transition-all"
                 >
-                  Load More Players ({meta.current_page}/{meta.total_pages})
+                  Load More ({meta.current_page}/{meta.total_pages})
                 </button>
               </div>
             )}
 
             {!isLoading && players.length === 0 && !error && (
-              <div className="text-center py-16">
-                <div className="bg-gray-800/50 rounded-xl p-8 max-w-lg mx-auto">
-                  <svg className="w-16 h-16 text-gray-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="text-center py-12">
+                <div className="bg-gray-800/50 rounded-lg p-8 max-w-md mx-auto border border-gray-700/50">
+                  <svg className="w-12 h-12 text-gray-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
-                  <p className="text-gray-400 text-xl mb-2">No players found</p>
-                  <p className="text-gray-500">Try adjusting your search criteria or selecting a different team</p>
+                  <p className="text-gray-400 text-sm mb-1">No players found</p>
+                  <p className="text-gray-500 text-xs">Try adjusting your search criteria</p>
                 </div>
               </div>
             )}
