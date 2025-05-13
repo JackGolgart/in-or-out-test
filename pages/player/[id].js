@@ -206,7 +206,8 @@ export async function getServerSideProps({ params }) {
     console.log('Fetching player data for ID:', id);
     
     // Fetch player data from our API endpoint
-    const playerRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/players/${id}`);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    const playerRes = await fetch(`${apiUrl}/api/players/${id}`);
     const playerData = await playerRes.json();
     
     if (!playerRes.ok) {
@@ -243,7 +244,7 @@ export async function getServerSideProps({ params }) {
     });
 
     // Fetch player history
-    const historyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/players/${id}/history`);
+    const historyRes = await fetch(`${apiUrl}/api/players/${id}/history`);
     const history = await historyRes.json();
 
     // Fetch recent games
