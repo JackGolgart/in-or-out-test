@@ -35,8 +35,20 @@ export default async function handler(req, res) {
       player_ids: [parseInt(id)]
     });
 
+    console.log('Player API Response:', {
+      status: 'success',
+      hasData: !!playerRes?.data,
+      dataLength: playerRes?.data?.length,
+      firstPlayer: playerRes?.data?.[0]?.id,
+      response: JSON.stringify(playerRes, null, 2)
+    });
+
     if (!playerRes?.data?.[0]) {
-      console.error('Player not found in API response:', { id, response: playerRes });
+      console.error('Player not found in API response:', { 
+        id, 
+        response: JSON.stringify(playerRes, null, 2),
+        apiKey: process.env.BALLDONTLIE_API_KEY ? 'Present' : 'Missing'
+      });
       return res.status(404).json({ error: 'Player not found' });
     }
 
