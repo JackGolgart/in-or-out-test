@@ -33,7 +33,8 @@ export default async function handler(req, res) {
     console.log('Player response:', {
       status: playerRes?.meta?.status,
       totalCount: playerRes?.meta?.total_count,
-      dataLength: playerRes?.data?.length
+      dataLength: playerRes?.data?.length,
+      data: playerRes?.data
     });
 
     if (!playerRes || !playerRes.data) {
@@ -49,7 +50,28 @@ export default async function handler(req, res) {
     const player = playerRes.data[0];
     if (!player) {
       console.error('Player not found:', id, 'Response:', playerRes);
-      return res.status(404).json({ error: 'Player not found' });
+      // Try fetching with search as fallback
+      try {
+        const searchRes = await api.getPlayers({ search: id.toString() });
+        console.log('Search response:', {
+          status: searchRes?.meta?.status,
+          totalCount: searchRes?.meta?.total_count,
+          dataLength: searchRes?.data?.length
+        });
+        
+        if (searchRes?.data?.length > 0) {
+          const foundPlayer = searchRes.data.find(p => p.id === parseInt(id));
+          if (foundPlayer) {
+            player = foundPlayer;
+          }
+        }
+      } catch (searchError) {
+        console.error('Search fallback failed:', searchError);
+      }
+      
+      if (!player) {
+        return res.status(404).json({ error: 'Player not found' });
+      }
     }
 
     let advancedStatsData = null;
