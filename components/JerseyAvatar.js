@@ -1,10 +1,28 @@
-import React from 'react';
-import TEAM_COLORS from '../lib/teamColors';
+import React, { useEffect, useState } from 'react';
 import getTeamLogo from '../lib/teamLogos';
 
-const JerseyAvatar = ({ teamAbbr, firstName, lastName, className = '', size = 'md' }) => {
+const JerseyAvatar = ({ teamAbbr, firstName, lastName, className = '', size = 'md', onLoad }) => {
+  const [teamColor, setTeamColor] = useState('#2D3748');
   const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
-  const teamColor = TEAM_COLORS[teamAbbr] || '#2D3748';
+  
+  useEffect(() => {
+    const fetchTeamColor = async () => {
+      try {
+        const response = await fetch('/api/teams');
+        const teams = await response.json();
+        const team = teams.find(t => t.abbreviation === teamAbbr);
+        if (team?.primary_color) {
+          setTeamColor(team.primary_color);
+        }
+      } catch (error) {
+        console.error('Error fetching team color:', error);
+      }
+    };
+
+    if (teamAbbr) {
+      fetchTeamColor();
+    }
+  }, [teamAbbr]);
   
   const sizeClasses = {
     sm: 'w-12 h-12 text-sm',
@@ -18,12 +36,13 @@ const JerseyAvatar = ({ teamAbbr, firstName, lastName, className = '', size = 'm
       style={{
         background: `linear-gradient(135deg, ${teamColor} 0%, rgba(0,0,0,0.3) 100%)`
       }}
+      onLoad={onLoad}
     >
       <div className="absolute inset-0 bg-black/10 backdrop-blur-[1px]"></div>
       <div 
         className="absolute inset-0 opacity-10"
         style={{
-          backgroundImage: `url(${getTeamLogo(teamAbbr)})`,
+          backgroundImage: teamAbbr ? `url(${getTeamLogo(teamAbbr)})` : 'none',
           backgroundSize: 'cover',
           backgroundPosition: 'center'
         }}
