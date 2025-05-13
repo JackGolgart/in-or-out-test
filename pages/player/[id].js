@@ -203,19 +203,25 @@ export default function PlayerProfile({ player, stats, gameStats, playerHistory,
 export async function getServerSideProps({ params }) {
   try {
     const { id } = params;
-    const currentSeason = getCurrentNBASeason();
     
-    // Fetch player details and history
-    const [playerRes, historyRes] = await Promise.all([
-      api.nba.getPlayers({ 
-        player_ids: [parseInt(id)],
-        per_page: 1
-      }),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/players/${id}/history`)
-    ]);
+    // Fetch player data from our API endpoint
+    const playerRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/player/${id}`);
+    if (!playerRes.ok) {
+      const error = await playerRes.json();
+      console.error('Player API error:', error);
+      return {
+        props: {
+          error: error.error || 'Failed to load player data',
+          player: null,
+          stats: null,
+          gameStats: [],
+          playerHistory: []
+        }
+      };
+    }
 
-    if (!playerRes.data?.[0]) {
-      console.error('Player not found:', { id, response: playerRes });
+    const { player, seasonAverages } = await playerRes.json();
+    if (!player) {
       return {
         props: {
           error: 'Player not found',
@@ -227,52 +233,24 @@ export async function getServerSideProps({ params }) {
       };
     }
 
-    const playerData = playerRes.data[0];
+    // Fetch player history
+    const historyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/players/${id}/history`);
     const history = await historyRes.json();
 
-    // Fetch player stats and advanced stats
-    const [statsRes, advancedStatsRes] = await Promise.all([
-      api.nba.getStats({ 
-        player_ids: [parseInt(id)],
-        seasons: [currentSeason],
-        per_page: 100
-      }),
-      fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${id}&seasons[]=${currentSeason}&per_page=100`, {
-        headers: {
-          Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
-        },
-      })
-    ]);
+    // Fetch recent games
+    const currentSeason = getCurrentNBASeason();
+    const statsRes = await api.nba.getStats({ 
+      player_ids: [parseInt(id)],
+      seasons: [currentSeason],
+      per_page: 10
+    });
 
-    const advancedStats = await advancedStatsRes.json();
-    let combinedStats = null;
-    let recentGames = [];
-
-    if (statsRes.data?.length > 0) {
-      // Get the most recent stats
-      const mostRecentStats = statsRes.data.reduce((latest, current) => {
-        if (!latest || new Date(current.game.date) > new Date(latest.game.date)) {
-          return current;
-        }
-        return latest;
-      }, null);
-
-      // Combine regular stats with advanced stats
-      combinedStats = {
-        ...mostRecentStats,
-        ...advancedStats.data?.[0]
-      };
-
-      // Get last 10 games for the stats carousel
-      recentGames = statsRes.data
-        .sort((a, b) => new Date(b.game.date) - new Date(a.game.date))
-        .slice(0, 10);
-    }
+    const recentGames = statsRes.data || [];
 
     return {
       props: {
-        player: playerData,
-        stats: combinedStats,
+        player,
+        stats: seasonAverages,
         gameStats: recentGames,
         playerHistory: history
       }
