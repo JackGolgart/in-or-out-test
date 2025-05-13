@@ -177,7 +177,7 @@ const handler = async (req, res) => {
     }
 
     // Clean and validate search query
-    const cleanSearch = search.trim().toLowerCase();
+    const cleanSearch = search.trim();
     const hasSearch = cleanSearch.length > 0;
 
     // Use the SDK to fetch players with search
@@ -287,17 +287,17 @@ const handler = async (req, res) => {
     let filteredPlayers = activePlayers;
     if (hasSearch) {
       filteredPlayers = activePlayers.filter(player => {
-        const fullName = `${player.first_name} ${player.last_name}`.toLowerCase();
-        const teamName = player.team?.full_name?.toLowerCase() || '';
-        const teamAbbr = player.team?.abbreviation?.toLowerCase() || '';
+        const fullName = `${player.first_name} ${player.last_name}`;
+        const teamName = player.team?.full_name || '';
+        const teamAbbr = player.team?.abbreviation || '';
         
         // Try exact match first
         if (fullName === cleanSearch) return true;
         
-        // Then try partial matches
-        return fullName.includes(cleanSearch) || 
-               teamName.includes(cleanSearch) || 
-               teamAbbr.includes(cleanSearch);
+        // Then try partial matches (case-insensitive)
+        return fullName.toLowerCase().includes(cleanSearch.toLowerCase()) || 
+               teamName.toLowerCase().includes(cleanSearch.toLowerCase()) || 
+               teamAbbr.toLowerCase().includes(cleanSearch.toLowerCase());
       });
 
       console.log('Filtered players:', {
