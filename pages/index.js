@@ -119,10 +119,18 @@ export default function HomePage() {
     const fetchTeams = async () => {
       try {
         const response = await fetch('/api/teams');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch teams: ${response.status}`);
+        }
         const data = await response.json();
+        if (!Array.isArray(data)) {
+          throw new Error('Invalid teams response format');
+        }
         setTeams(['All Teams', ...data.map(team => team.full_name)]);
       } catch (error) {
         console.error('Error fetching teams:', error);
+        // Set default teams list on error
+        setTeams(['All Teams']);
       }
     };
     fetchTeams();
