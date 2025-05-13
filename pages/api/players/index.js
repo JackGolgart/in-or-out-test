@@ -72,6 +72,32 @@ const handler = async (req, res) => {
       envVars: Object.keys(process.env).filter(key => key.includes('BALL'))
     });
 
+    // Try direct API call first
+    try {
+      console.log('Attempting direct API call...');
+      const directResponse = await fetch('https://api.balldontlie.io/v2/players?per_page=1', {
+        headers: {
+          'Authorization': `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!directResponse.ok) {
+        const errorText = await directResponse.text();
+        console.error('Direct API call failed:', {
+          status: directResponse.status,
+          statusText: directResponse.statusText,
+          error: errorText,
+        });
+        throw new Error(`Direct API call failed: ${errorText}`);
+      }
+
+      console.log('Direct API call successful');
+    } catch (directError) {
+      console.error('Direct API call error:', directError);
+      return errorHandler(res, 500, `API Key validation failed: ${directError.message}`);
+    }
+
     // Initialize API client
     let apiInstance;
     try {
@@ -81,8 +107,11 @@ const handler = async (req, res) => {
         throw new Error('Failed to initialize API client');
       }
     } catch (initError) {
-      console.error('API initialization error:', initError);
-      return errorHandler(res, 500, initError.message || 'Failed to initialize API client');
+      console.error('API initialization error:', {
+        error: initError,
+        stack: initError.stack,
+      });
+      return errorHandler(res, 500, `Client initialization failed: ${initError.message}`);
     }
 
     // Use the SDK to fetch players
@@ -91,7 +120,10 @@ const handler = async (req, res) => {
       per_page: Math.min(100, Math.max(1, parseInt(per_page))),
       ...(search && { search: search.trim() })
     }).catch(error => {
-      console.error('SDK Error:', error);
+      console.error('SDK Error:', {
+        error,
+        stack: error.stack,
+      });
       throw error;
     });
 
@@ -111,7 +143,10 @@ const handler = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Unhandled API error:', error);
+    console.error('Unhandled API error:', {
+      message: error.message,
+      stack: error.stack,
+    });
     return errorHandler(res, 500, error.message || 'Failed to fetch players');
   }
 };
