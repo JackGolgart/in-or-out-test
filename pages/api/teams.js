@@ -1,4 +1,4 @@
-import api from '../../lib/bdlClient';
+import { getClient } from '../../lib/bdlClient';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -6,15 +6,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const teams = await api.getTeams();
+    const client = await getClient();
+    const teams = await client.teams();
     
-    // Transform the data to include colors
-    const teamsWithColors = teams.data.map(team => ({
-      ...team,
-      primary_color: getTeamColor(team.abbreviation),
-    }));
-
-    res.status(200).json(teamsWithColors);
+    // Sort teams alphabetically by full name
+    const sortedTeams = teams.sort((a, b) => a.full_name.localeCompare(b.full_name));
+    
+    res.status(200).json(sortedTeams);
   } catch (error) {
     console.error('Error fetching teams:', error);
     res.status(500).json({ error: 'Failed to fetch teams' });

@@ -11,6 +11,19 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { trackComponentRender } from '../utils/performance';
 
+const FilterButton = ({ active, children, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+      active
+        ? 'bg-purple-600 text-white'
+        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 hover:text-white'
+    }`}
+  >
+    {children}
+  </button>
+);
+
 const SearchSection = ({ query, setQuery, searchMessage }) => (
   <div className="bg-gray-900/80 border-b border-gray-800 sticky top-16 z-10 backdrop-blur-sm">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -35,31 +48,44 @@ const SearchSection = ({ query, setQuery, searchMessage }) => (
   </div>
 );
 
+const getNetRatingColor = (rating) => {
+  if (!rating && rating !== 0) return 'text-gray-400';
+  if (rating > 5) return 'text-green-400';
+  if (rating > 0) return 'text-emerald-400';
+  if (rating < -5) return 'text-red-400';
+  if (rating < 0) return 'text-orange-400';
+  return 'text-yellow-400';
+};
+
 const PlayerCard = ({ player, onClick }) => (
   <div 
     onClick={onClick}
-    className="bg-gray-800/50 rounded-lg p-4 hover:bg-gray-800/70 transition-all cursor-pointer border border-gray-700/50 hover:border-purple-500/50"
+    className="card-interactive group cursor-pointer"
   >
-    <div className="flex items-center space-x-4">
-      <div className="w-12 h-12">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center space-x-4">
         <JerseyAvatar
           teamAbbr={player.team.abbreviation}
           firstName={player.first_name}
           lastName={player.last_name}
-          className="w-full h-full"
+          size="sm"
         />
-      </div>
-      <div className="flex-1 min-w-0">
-        <h3 className="text-white text-sm font-medium truncate">
-          {player.first_name} {player.last_name}
-        </h3>
-        <p className="text-gray-400 text-xs truncate">{player.team.full_name}</p>
+        <div>
+          <h3 className="text-lg font-semibold text-white group-hover:text-purple-300 transition-colors duration-300">
+            {player.first_name} {player.last_name}
+          </h3>
+          <p className="text-sm text-gray-400">
+            {player.team.full_name}
+          </p>
+        </div>
       </div>
       <div className="text-right">
-        <div className="text-purple-400 text-sm font-medium">
-          {player.net_rating !== null ? player.net_rating.toFixed(1) : 'N/A'}
-        </div>
-        <p className="text-gray-500 text-xs">NET</p>
+        <p className="text-sm text-gray-400">
+          Net Rating {player.season ? `(${player.season}-${player.season + 1})` : ''}
+        </p>
+        <p className={`text-lg font-semibold ${getNetRatingColor(player.net_rating)}`}>
+          {player.net_rating ? player.net_rating.toFixed(1) : 'N/A'}
+        </p>
       </div>
     </div>
   </div>
@@ -69,13 +95,28 @@ export default function HomePage() {
   const router = useRouter();
   const [players, setPlayers] = useState([]);
   const [query, setQuery] = useState('');
+  const [selectedTeam, setSelectedTeam] = useState('All Teams');
   const [isLoading, setIsLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [renderStart] = useState(Date.now());
   const [searchMessage, setSearchMessage] = useState('');
   const [error, setError] = useState(null);
-  const [meta, setMeta] = useState({ total_pages: 1, current_page: 1, next_page: null });
+  const [activeFilter, setActiveFilter] = useState('INS - 24H');
+  const [teams, setTeams] = useState([]);
+
+  useEffect(() => {
+    const fetchTeams = async () => {
+      try {
+        const response = await fetch('/api/teams');
+        const data = await response.json();
+        setTeams(['All Teams', ...data.map(team => team.full_name)]);
+      } catch (error) {
+        console.error('Error fetching teams:', error);
+      }
+    };
+    fetchTeams();
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -172,7 +213,6 @@ export default function HomePage() {
         const newPlayers = Array.isArray(data.data) ? data.data : [];
         
         if (data.meta) {
-          setMeta(data.meta);
           setHasMore(data.meta.current_page < data.meta.total_pages);
         }
 
@@ -208,88 +248,129 @@ export default function HomePage() {
 
   return (
     <Layout>
-      <ErrorBoundary>
-        <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950">
-          {/* Header */}
-          <div className="relative bg-gray-900/95 border-b border-gray-800/50 backdrop-blur-sm">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <div className="flex flex-col space-y-2">
-                <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
-                  NBA Player Analytics
-                </h1>
-                <p className="text-gray-400 text-sm md:text-base">
-                  Track performance metrics and discover insights
-                </p>
-              </div>
-            </div>
-          </div>
-
+      <div className="min-h-screen">
+        {/* Hero Section */}
+        <div className="py-12 px-4 sm:px-6 lg:px-8 text-center">
+          <h1 className="text-4xl font-bold text-white mb-4">
+            Pick Your Players
+          </h1>
+          <p className="text-gray-400 text-lg mb-8">
+            Search NBA players, filter by team, and track top picks!
+          </p>
+          
           {/* Search Section */}
-          <SearchSection
-            query={query}
-            setQuery={setQuery}
-            searchMessage={searchMessage}
-          />
-
-          {/* Content Section */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {error && (
-              <div className="mb-8">
-                <div className="bg-red-900/20 border border-red-800/50 rounded-lg px-4 py-3">
-                  <p className="text-red-400 text-sm flex items-center">
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {error}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {players.map(player => (
-                <PlayerCard
-                  key={player.id}
-                  player={player}
-                  onClick={() => router.push(`/player/${player.id}`)}
+          <div className="max-w-4xl mx-auto">
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search players by name..."
+                  className="input-primary"
                 />
-              ))}
+              </div>
+              <select
+                value={selectedTeam}
+                onChange={(e) => setSelectedTeam(e.target.value)}
+                className="input-primary max-w-[200px]"
+              >
+                {teams.map((team) => (
+                  <option key={team} value={team}>
+                    {team}
+                  </option>
+                ))}
+              </select>
             </div>
-
-            {isLoading && (
-              <div className="flex justify-center items-center py-12">
-                <LoadingSpinner 
-                  size="lg"
-                  message={players.length > 0 ? "Loading more players..." : "Searching players..."}
-                />
-              </div>
-            )}
-
-            {!isLoading && players.length > 0 && hasMore && (
-              <div className="text-center py-8">
-                <button
-                  onClick={() => fetchPlayers(true)}
-                  className="bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 text-sm font-medium px-6 py-3 rounded-lg border border-purple-600/30 hover:border-purple-600/50 transition-all duration-300"
-                >
-                  Load More ({meta.current_page}/{meta.total_pages})
-                </button>
-              </div>
-            )}
-
-            {!isLoading && players.length === 0 && !error && (
-              <div className="flex items-center justify-center py-16">
-                <div className="bg-gray-800/50 rounded-lg p-8 max-w-md w-full border border-gray-700/50 text-center">
-                  <svg className="w-12 h-12 text-gray-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <p className="text-gray-400 text-lg font-medium mb-2">No players found</p>
-                  <p className="text-gray-500 text-sm">Try adjusting your search criteria</p>
-                </div>
-              </div>
+            {searchMessage && (
+              <p className="mt-2 text-sm text-gray-400">{searchMessage}</p>
             )}
           </div>
         </div>
-      </ErrorBoundary>
-    </Layout>
-  );
-}
+
+        {/* Players Section */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {error ? (
+            <div className="text-center py-12">
+              <p className="text-red-400 mb-4">{error}</p>
+              <button
+                onClick={() => fetchPlayers(false)}
+                className="btn-primary"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Filter Tabs */}
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold text-white mb-4">
+                  Trending Players
+                </h2>
+                <div className="flex gap-2">
+                  <FilterButton
+                    active={activeFilter === 'INS - 24H'}
+                    onClick={() => setActiveFilter('INS - 24H')}
+                  >
+                    INS - 24H
+                  </FilterButton>
+                  <FilterButton
+                    active={activeFilter === 'OUTS - 24H'}
+                    onClick={() => setActiveFilter('OUTS - 24H')}
+                  >
+                    OUTS - 24H
+                  </FilterButton>
+                  <FilterButton
+                    active={activeFilter === 'INS - 7D'}
+                    onClick={() => setActiveFilter('INS - 7D')}
+                  >
+                    INS - 7D
+                  </FilterButton>
+                  <FilterButton
+                    active={activeFilter === 'OUTS - 7D'}
+                    onClick={() => setActiveFilter('OUTS - 7D')}
+                  >
+                    OUTS - 7D
+                  </FilterButton>
+                </div>
+              </div>
+
+              {/* Players Grid */}
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                {isLoading && players.length === 0 ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="card-base animate-pulse">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 bg-gray-700 rounded-full"></div>
+                        <div className="flex-1">
+                          <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
+                          <div className="h-3 bg-gray-700 rounded w-1/2"></div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : players.length > 0 ? (
+                  players.map((player) => (
+                    <div key={player.id} className="card-interactive">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <JerseyAvatar
+                            teamAbbr={player.team.abbreviation}
+                            firstName={player.first_name}
+                            lastName={player.last_name}
+                            size="sm"
+                          />
+                          <div>
+                            <h3 className="text-lg font-semibold text-white group-hover:text-purple-300 transition-colors duration-300">
+                              {player.first_name} {player.last_name}
+                            </h3>
+                            <p className="text-sm text-gray-400">
+                              {player.team.full_name}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-400">
+                            Net Rating {player.season ? `(${player.season}-${player.season + 1})` : ''}
+                          </p>
+                          <p className={`text-lg font-semibold ${getNetRatingColor(player.net_rating)}`

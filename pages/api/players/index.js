@@ -38,6 +38,53 @@ const errorHandler = (res, status, error) => {
   });
 };
 
+// Function to get current NBA season
+function getCurrentNBASeason() {
+  const today = new Date();
+  const month = today.getMonth() + 1; // JavaScript months are 0-based
+  const year = today.getFullYear();
+  
+  // If we're in October or later, it's the season starting in that year
+  // If we're in January through September, it's the season that started the previous year
+  return month >= 10 ? year : year - 1;
+}
+
+async function fetchPlayerStats(api, playerId) {
+  try {
+    const currentSeason = getCurrentNBASeason();
+    console.log(`Fetching stats for player ${playerId} for season ${currentSeason}`);
+    
+    const stats = await api.nba.getPlayerStats({
+      player_ids: [playerId],
+      seasons: [currentSeason]  // Dynamically set current season
+    });
+
+    if (!stats || !stats.data || stats.data.length === 0) {
+      return null;
+    }
+
+    const playerStats = stats.data[0];
+    
+    // Calculate NET rating
+    // NET rating = (Offensive Rating - Defensive Rating)
+    const netRating = playerStats.offensive_rating 
+      ? (playerStats.offensive_rating - playerStats.defensive_rating)
+      : null;
+
+    return {
+      net_rating: netRating,
+      pts: playerStats.pts,
+      reb: playerStats.reb,
+      ast: playerStats.ast,
+      games_played: playerStats.games_played,
+      season: currentSeason // Include the season in the response
+    };
+  } catch (error) {
+    console.error(`Error fetching stats for player ${playerId}:`, error);
+    return null;
+  }
+}
+
 const handler = async (req, res) => {
   // Force JSON content type
   res.setHeader('Content-Type', 'application/json');
@@ -133,12 +180,20 @@ const handler = async (req, res) => {
 
     const players = response.data;
 
+    // Fetch stats for each player in parallel
+    const playersWithStats = await Promise.all(
+      players.map(async (player) => {
+        const stats = await fetchPlayerStats(apiInstance, player.id);
+        return {
+          ...player,
+          ...stats
+        };
+      })
+    );
+
     // Send final response
     return res.status(200).json({
-      data: players.map(player => ({
-        ...player,
-        net_rating: null, // We'll fetch this separately if needed
-      })),
+      data: playersWithStats,
       meta: response.meta
     });
 

@@ -9,7 +9,7 @@ import { trackComponentRender } from '../utils/performance';
 import LoadingSpinner from './LoadingSpinner';
 
 const LoadingSkeleton = () => (
-  <div className="bg-gray-800/50 rounded-xl p-4 shadow-lg border border-gray-700/50">
+  <div className="card-base">
     <div className="animate-pulse space-y-3">
       <div className="flex items-center space-x-4">
         <div className="relative w-12 h-12">
@@ -64,55 +64,47 @@ export default function PlayerCard({ player, onClick }) {
   if (!player) return <LoadingSkeleton />;
 
   return (
-    <div
-      onClick={onClick}
-      className="group bg-gray-800/50 hover:bg-gray-800/70 rounded-xl p-4 border border-gray-700/50 hover:border-purple-500/30 shadow-lg hover:shadow-purple-500/10 transition-all duration-300 cursor-pointer backdrop-blur-sm"
-    >
-      <div className="flex items-center space-x-4 mb-4">
-        <div className="relative flex-shrink-0">
-          <JerseyAvatar
-            teamAbbreviation={player.team?.abbreviation}
-            className="w-12 h-12 rounded-full"
-            onLoad={() => setIsLoading(false)}
-          />
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-800 rounded-full">
-              <LoadingSpinner size="sm" />
-            </div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="text-white font-medium truncate group-hover:text-purple-400 transition-colors duration-300">
-            {player.first_name} {player.last_name}
-          </h3>
-          <p className="text-gray-400 text-sm truncate">
-            {player.position} • {player.team?.abbreviation}
-          </p>
-        </div>
-      </div>
+    <div className="card-interactive group">
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <span className="text-sm font-medium px-2 py-1 rounded-md bg-gray-900/50 text-gray-300 border border-gray-700/30">
-            {player.team?.conference}
-          </span>
-        </div>
-        {user && (
-          <div className="flex items-center space-x-2">
-            {prediction ? (
-              <span className={`px-3 py-1 rounded-lg text-sm font-medium ${
-                prediction === 'IN' 
-                  ? 'bg-green-900/20 text-green-400 border border-green-500/30' 
-                  : 'bg-red-900/20 text-red-400 border border-red-500/30'
-              }`}>
-                {prediction}
-              </span>
-            ) : (
-              <span className="px-3 py-1 rounded-lg text-sm font-medium bg-gray-900/50 text-gray-400 border border-gray-700/30">
-                No Pick
-              </span>
-            )}
+        <div className="flex items-center space-x-4">
+          <JerseyAvatar
+            teamAbbr={player.team.abbreviation}
+            firstName={player.first_name}
+            lastName={player.last_name}
+            size="sm"
+          />
+          <div>
+            <h3 className="text-lg font-semibold text-white group-hover:text-purple-300 transition-colors duration-300">
+              {player.first_name} {player.last_name}
+            </h3>
+            <p className="text-sm text-gray-400">
+              {player.team.full_name}
+            </p>
           </div>
-        )}
+        </div>
+        <div className="flex items-center space-x-4">
+          <div className="text-right">
+            <p className="text-sm text-gray-400">Net Rating</p>
+            <p className={`text-lg font-semibold ${getNetRatingColor(player.net_rating)}`}>
+              {player.net_rating ? player.net_rating.toFixed(1) : 'N/A'}
+            </p>
+          </div>
+          <button
+            onClick={handlePick}
+            disabled={isLoading || !user}
+            className={`btn-primary min-w-[100px] ${
+              prediction ? 'bg-gray-600 hover:bg-gray-700' : ''
+            }`}
+          >
+            {isLoading ? (
+              <LoadingSpinner size="sm" />
+            ) : prediction ? (
+              'Picked'
+            ) : (
+              'Pick'
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

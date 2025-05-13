@@ -162,7 +162,7 @@ export default function NetRatingTrendChart({ data, isLoading, error }) {
 
   if (isLoading) {
     return (
-      <div className="bg-gray-800/80 backdrop-blur-sm rounded-xl p-6 shadow-lg">
+      <div className="card-base">
         <div className="h-64 flex items-center justify-center">
           <div className="animate-pulse space-y-4 w-full">
             <div className="h-4 bg-gray-700 rounded w-1/4 mx-auto"></div>
@@ -175,13 +175,13 @@ export default function NetRatingTrendChart({ data, isLoading, error }) {
 
   if (error) {
     return (
-      <div className="bg-gray-800/80 backdrop-blur-sm rounded-xl p-6 shadow-lg">
+      <div className="card-base">
         <div className="h-64 flex items-center justify-center">
           <div className="text-center">
             <p className="text-red-400 mb-3">Failed to load chart data</p>
             <button 
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors duration-200"
+              className="btn-secondary bg-red-500/20 text-red-400 hover:bg-red-500/30"
             >
               Try refreshing
             </button>
@@ -193,7 +193,7 @@ export default function NetRatingTrendChart({ data, isLoading, error }) {
 
   if (!chartData) {
     return (
-      <div className="bg-gray-800/80 backdrop-blur-sm rounded-xl p-6 shadow-lg">
+      <div className="card-base">
         <div className="h-64 flex items-center justify-center">
           <p className="text-gray-400">No data available</p>
         </div>
@@ -202,7 +202,7 @@ export default function NetRatingTrendChart({ data, isLoading, error }) {
   }
 
   return (
-    <div className="bg-gray-800/80 backdrop-blur-sm rounded-xl p-6 shadow-lg transition-all duration-300 hover:shadow-purple-500/10">
+    <div className="card-interactive">
       <div className="h-64">
         <Line data={chartData} options={options} />
       </div>
