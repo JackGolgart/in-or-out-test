@@ -183,11 +183,22 @@ const handler = async (req, res) => {
     // Use the SDK to fetch players with search
     let response;
     try {
-      response = await apiInstance.nba.getPlayers({
+      // For specific player names, try exact match first
+      const searchParams = {
         page: Math.max(1, parseInt(page)),
-        per_page: Math.min(100, Math.max(1, parseInt(per_page))),
-        ...(hasSearch && { search: cleanSearch })
-      });
+        per_page: Math.min(100, Math.max(1, parseInt(per_page)))
+      };
+
+      // If it looks like a full name, try exact match first
+      if (cleanSearch.includes(' ')) {
+        const [firstName, lastName] = cleanSearch.split(' ');
+        searchParams.search = `${firstName} ${lastName}`;
+      } else {
+        searchParams.search = cleanSearch;
+      }
+
+      console.log('Searching with params:', searchParams);
+      response = await apiInstance.nba.getPlayers(searchParams);
     } catch (error) {
       console.error('SDK Error:', {
         error,
@@ -252,6 +263,10 @@ const handler = async (req, res) => {
         const teamName = player.team?.full_name?.toLowerCase() || '';
         const teamAbbr = player.team?.abbreviation?.toLowerCase() || '';
         
+        // Try exact match first
+        if (fullName === cleanSearch) return true;
+        
+        // Then try partial matches
         return fullName.includes(cleanSearch) || 
                teamName.includes(cleanSearch) || 
                teamAbbr.includes(cleanSearch);
@@ -286,7 +301,8 @@ const handler = async (req, res) => {
         searchQuery: cleanSearch,
         originalCount: players.length,
         activeCount: activePlayers.length,
-        filteredCount: filteredPlayers.length
+        filteredCount: filteredPlayers.length,
+        firstPlayer: players[0]
       });
       return res.status(200).json({
         data: [],
