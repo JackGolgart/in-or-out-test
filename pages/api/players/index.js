@@ -266,14 +266,92 @@ const handler = async (req, res) => {
     const playersWithStats = await Promise.all(
       players.map(async (player) => {
         try {
-          const stats = await fetchPlayerStats(apiV2 || apiInstance, player.id);
-          return {
-            ...player,
-            ...stats
+          console.log(`Fetching stats for player ${player.id} for season ${currentSeason}`);
+          
+          // First get most recent game to determine current team
+          const recentStatsResponse = await apiInstance.nba.getStats({
+            player_ids: [player.id],
+            seasons: [currentSeason],
+            per_page: 1,
+            sort: ['-game.date']
+          });
+
+          // Update player's team if they have recent games
+          if (recentStatsResponse?.data?.[0]?.team) {
+            player.team = recentStatsResponse.data[0].team;
+            console.log('Updated player team:', {
+              id: player.id,
+              name: `${player.first_name} ${player.last_name}`,
+              team: player.team.full_name
+            });
+          }
+
+          // Then get all stats for season averages
+          const statsResponse = await apiInstance.nba.getStats({
+            player_ids: [player.id],
+            seasons: [currentSeason],
+            per_page: 25
+          });
+
+          console.log('Regular stats response:', {
+            hasData: !!statsResponse?.data,
+            dataLength: statsResponse?.data?.length,
+            firstPlayer: statsResponse?.data?.[0]?.player?.id,
+            stats: statsResponse?.data?.[0]
+          });
+
+          if (!statsResponse?.data?.length) {
+            console.log(`No regular stats found for player: ${player.id}`);
+            return {
+              ...player,
+              net_rating: null,
+              pts: 0,
+              reb: 0,
+              ast: 0,
+              games_played: 0,
+              season: currentSeason
+            };
+          }
+
+          // Calculate season averages
+          const stats = statsResponse.data;
+          const totalGames = stats.length;
+          
+          const seasonAverages = {
+            games_played: totalGames,
+            pts: (stats.reduce((sum, game) => sum + (game.pts || 0), 0) / totalGames).toFixed(1),
+            reb: (stats.reduce((sum, game) => sum + (game.reb || 0), 0) / totalGames).toFixed(1),
+            ast: (stats.reduce((sum, game) => sum + (game.ast || 0), 0) / totalGames).toFixed(1)
           };
+
+          const finalStats = {
+            playerId: player.id,
+            netRating: null,
+            hasAdvancedStats: false,
+            advancedStatsData: null,
+            stats: {
+              net_rating: null,
+              pts: parseFloat(seasonAverages.pts),
+              reb: parseFloat(seasonAverages.reb),
+              ast: parseFloat(seasonAverages.ast),
+              games_played: seasonAverages.games_played,
+              season: currentSeason
+            }
+          };
+
+          console.log('Final stats object:', finalStats);
+          return { ...player, ...finalStats.stats };
         } catch (error) {
           console.error(`Error fetching stats for player ${player.id}:`, error);
-          return player;
+          return {
+            ...player,
+            net_rating: null,
+            pts: 0,
+            reb: 0,
+            ast: 0,
+            games_played: 0,
+            season: currentSeason
+          };
         }
       })
     );
