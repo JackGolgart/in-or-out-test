@@ -1,61 +1,100 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import { supabase } from '../../lib/supabase';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import 'swiper/css';
+import 'swiper/css/pagination';
+import { Pagination, Autoplay } from 'swiper/modules';
 import api from '../../lib/bdlClient';
 import Layout from '../../components/Layout';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
-export default function PlayerProfile({ player, stats, netRating }) {
+export default function PlayerProfile() {
   const router = useRouter();
-  const [pick, setPick] = useState(null);
-  const [trend, setTrend] = useState('');
+  const { id } = router.query;
+  const [player, setPlayer] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [gameStats, setGameStats] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchPick = async () => {
-      const session = await supabase.auth.getSession();
-      const user = session?.data?.session?.user;
-      if (!user || !netRating || !player?.id) return;
+    const fetchPlayerData = async () => {
+      if (!id) return;
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // Fetch player details
+        const playerRes = await api.nba.getPlayers({ per_page: 1, search: id });
+        if (!playerRes.data?.[0]) {
+          throw new Error('Player not found');
+        }
+        const playerData = playerRes.data[0];
+        setPlayer(playerData);
 
-      const { data } = await supabase
-        .from('picks')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('player_id', player.id)
-        .maybeSingle();
+        // Fetch player stats
+        const statsRes = await api.nba.getStats({ 
+          player_ids: [id],
+          seasons: [2023],
+          per_page: 100
+        });
 
-      if (data) {
-        setPick(data);
-        const delta = netRating - data.initial_net_rating;
-        setTrend(delta > 0 ? '📈' : delta < 0 ? '📉' : '➖');
+        if (statsRes.data?.length > 0) {
+          // Get the most recent stats
+          const mostRecentStats = statsRes.data.reduce((latest, current) => {
+            if (!latest || new Date(current.game.date) > new Date(latest.game.date)) {
+              return current;
+            }
+            return latest;
+          }, null);
+
+          setStats(mostRecentStats);
+          
+          // Store last 10 games for the stats carousel
+          const sortedGames = statsRes.data
+            .sort((a, b) => new Date(b.game.date) - new Date(a.game.date))
+            .slice(0, 10);
+          setGameStats(sortedGames);
+        }
+      } catch (err) {
+        console.error('Error fetching player data:', err);
+        setError(err.message || 'Failed to load player data');
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    fetchPick();
-  }, [player?.id, netRating]);
+    fetchPlayerData();
+  }, [id]);
 
-  const handlePick = async (selection) => {
-    const session = await supabase.auth.getSession();
-    const user = session?.data?.session?.user;
-    if (!user || !netRating) return;
-
-    const { data, error } = await supabase.from('picks').upsert({
-      user_id: user.id,
-      player_id: player.id,
-      player_name: `${player.first_name} ${player.last_name}`,
-      selection,
-      initial_net_rating: netRating,
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
     });
-
-    if (!error) {
-      setPick({ selection, initial_net_rating: netRating });
-    }
   };
 
-  if (router.isFallback) {
-    return <Layout><div className="text-white p-6">Loading...</div></Layout>;
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-gradient-to-br from-black to-gray-900 flex items-center justify-center">
+          <LoadingSpinner size="lg" message="Loading player data..." />
+        </div>
+      </Layout>
+    );
   }
 
-  if (!player || !player.id) {
-    return <Layout><div className="text-red-500 p-6">Player not found.</div></Layout>;
+  if (error || !player) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-gradient-to-br from-black to-gray-900 flex items-center justify-center">
+          <div className="text-red-500 bg-red-900/20 rounded-xl px-6 py-4">
+            {error || 'Player not found'}
+          </div>
+        </div>
+      </Layout>
+    );
   }
 
   return (
@@ -63,51 +102,132 @@ export default function PlayerProfile({ player, stats, netRating }) {
       <div className="min-h-screen bg-gradient-to-br from-black to-gray-900 text-white px-6 py-12">
         <div className="max-w-4xl mx-auto space-y-10">
           <div className="text-center">
-            <h1 className="text-4xl font-bold tracking-wide">
+            <h1 className="text-4xl font-bold tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
               {player.first_name} {player.last_name}
             </h1>
-            <p className="text-gray-400">{player.position} — {player.team?.full_name}</p>
+            <p className="text-gray-400 mt-2">{player.position} — {player.team?.full_name}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-gray-800 p-6 rounded-xl border border-purple-500/30 shadow-md">
-              <h2 className="text-purple-300 text-lg font-semibold mb-2">NET Rating (Advanced Stats)</h2>
-              <p className="text-5xl font-bold text-purple-100 animate-pulse">{netRating ?? 'N/A'}</p>
-              {trend && (
-                <p className="text-gray-300 mt-2">Trend since your pick: <span className="text-xl">{trend}</span></p>
-              )}
-            </div>
-
-            <div className="bg-gray-800 p-6 rounded-xl border border-cyan-500/30 shadow-md">
-              <h2 className="text-cyan-300 text-lg font-semibold mb-2">Make Your Pick</h2>
-              {pick ? (
-                <p className="text-green-400 text-lg">You picked: {pick.selection.toUpperCase()}</p>
-              ) : (
-                <div className="flex gap-4">
-                  <button onClick={() => handlePick('in')} className="px-4 py-2 bg-green-600 rounded-md hover:bg-green-700">
-                    IN
-                  </button>
-                  <button onClick={() => handlePick('out')} className="px-4 py-2 bg-red-600 rounded-md hover:bg-red-700">
-                    OUT
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-gray-900 p-6 rounded-xl border border-slate-600 mt-4">
-            <h3 className="text-white text-lg font-bold mb-2">Season Averages (2023)</h3>
-            {stats ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm text-gray-300">
-                <p><span className="text-white">PTS:</span> {stats.pts}</p>
-                <p><span className="text-white">REB:</span> {stats.reb}</p>
-                <p><span className="text-white">AST:</span> {stats.ast}</p>
-                <p><span className="text-white">STL:</span> {stats.stl}</p>
-                <p><span className="text-white">BLK:</span> {stats.blk}</p>
-                <p><span className="text-white">TO:</span> {stats.turnover}</p>
+            <div className="bg-gray-800/80 backdrop-blur-sm p-6 rounded-xl border border-purple-500/30 shadow-md hover:shadow-purple-500/10 transition-all duration-300">
+              <h2 className="text-purple-300 text-lg font-semibold mb-2">NET Rating</h2>
+              <div className="flex items-baseline gap-2">
+                <p className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">
+                  {stats?.net_rating ? stats.net_rating.toFixed(1) : 'N/A'}
+                </p>
+                {stats?.net_rating && (
+                  <span className="text-sm text-gray-400">
+                    points per 100 possessions
+                  </span>
+                )}
               </div>
-            ) : <p>No season stats found.</p>}
+              <p className="text-gray-400 text-sm mt-4">
+                Team's point differential per 100 possessions while the player is on court
+              </p>
+            </div>
+
+            <div className="bg-gray-800/80 backdrop-blur-sm p-6 rounded-xl border border-cyan-500/30 shadow-md hover:shadow-cyan-500/10 transition-all duration-300">
+              <h2 className="text-cyan-300 text-lg font-semibold mb-2">Current Season Stats</h2>
+              {stats ? (
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-2">
+                    <p className="text-gray-300">
+                      <span className="text-cyan-200">Minutes:</span> {stats.min}
+                    </p>
+                    <p className="text-gray-300">
+                      <span className="text-cyan-200">Points:</span> {stats.pts}
+                    </p>
+                    <p className="text-gray-300">
+                      <span className="text-cyan-200">Rebounds:</span> {stats.reb}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-gray-300">
+                      <span className="text-cyan-200">Assists:</span> {stats.ast}
+                    </p>
+                    <p className="text-gray-300">
+                      <span className="text-cyan-200">Steals:</span> {stats.stl}
+                    </p>
+                    <p className="text-gray-300">
+                      <span className="text-cyan-200">Blocks:</span> {stats.blk}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-gray-400">No recent stats available</p>
+              )}
+            </div>
           </div>
+
+          {gameStats.length > 0 && (
+            <div className="bg-gray-900/80 backdrop-blur-sm p-6 rounded-xl border border-slate-600">
+              <h3 className="text-white text-lg font-bold mb-6">Recent Games</h3>
+              <Swiper
+                modules={[Pagination, Autoplay]}
+                spaceBetween={20}
+                slidesPerView={1}
+                pagination={{ clickable: true }}
+                autoplay={{ delay: 3000, disableOnInteraction: false }}
+                breakpoints={{
+                  640: { slidesPerView: 2 },
+                  1024: { slidesPerView: 3 }
+                }}
+                className="pb-10"
+              >
+                {gameStats.map((game, index) => (
+                  <SwiperSlide key={index}>
+                    <div className="bg-gray-800/50 rounded-lg p-4 hover:bg-gray-800/70 transition-all duration-300">
+                      <p className="text-gray-400 text-sm mb-2">{formatDate(game.game.date)}</p>
+                      <p className="text-sm mb-1">
+                        <span className="text-gray-400">vs </span>
+                        <span className="text-white">{game.game.visitor_team_id === player.team.id ? game.game.home_team.abbreviation : game.game.visitor_team.abbreviation}</span>
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                        <p className="text-gray-300">
+                          <span className="text-purple-300">PTS:</span> {game.pts}
+                        </p>
+                        <p className="text-gray-300">
+                          <span className="text-purple-300">REB:</span> {game.reb}
+                        </p>
+                        <p className="text-gray-300">
+                          <span className="text-purple-300">AST:</span> {game.ast}
+                        </p>
+                        <p className="text-gray-300">
+                          <span className="text-purple-300">NET:</span> {game.net_rating?.toFixed(1) ?? 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  </SwiperSlide>
+                ))}
+              </Swiper>
+            </div>
+          )}
+
+          {stats && (
+            <div className="bg-gray-900/80 backdrop-blur-sm p-6 rounded-xl border border-slate-600">
+              <h3 className="text-white text-lg font-bold mb-4">Advanced Stats</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 text-sm">
+                <div className="bg-gray-800/50 p-4 rounded-lg hover:bg-gray-800/70 transition-all duration-300">
+                  <p className="text-gray-400">Usage Rate</p>
+                  <p className="text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">
+                    {stats.usage_rate?.toFixed(1)}%
+                  </p>
+                </div>
+                <div className="bg-gray-800/50 p-4 rounded-lg hover:bg-gray-800/70 transition-all duration-300">
+                  <p className="text-gray-400">True Shooting %</p>
+                  <p className="text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">
+                    {stats.ts_pct?.toFixed(3)}
+                  </p>
+                </div>
+                <div className="bg-gray-800/50 p-4 rounded-lg hover:bg-gray-800/70 transition-all duration-300">
+                  <p className="text-gray-400">Assist Ratio</p>
+                  <p className="text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">
+                    {stats.ast_ratio?.toFixed(1)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Layout>

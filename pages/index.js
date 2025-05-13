@@ -8,6 +8,7 @@ import api from '../lib/bdlClient';
 import Layout from '../components/Layout';
 import JerseyAvatar from '../components/JerseyAvatar';
 import ErrorBoundary from '../components/ErrorBoundary';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { trackComponentRender } from '../utils/performance';
 import { teams } from '../config/teams';
 
@@ -87,6 +88,7 @@ export default function HomePage() {
   const [renderStart] = useState(Date.now());
   const [searchMessage, setSearchMessage] = useState('');
   const [error, setError] = useState(null);
+  const [meta, setMeta] = useState({ total_pages: 1, current_page: 1, next_page: null });
 
   useEffect(() => {
     return () => {
@@ -131,18 +133,40 @@ export default function HomePage() {
     setError(null);
     try {
       const options = {
-        per_page: 10,
+        per_page: 25,
         page: isLoadMore ? page + 1 : 1,
       };
       if (query.length > 2) options.search = query;
       if (selectedTeam) options.team_ids = [parseInt(selectedTeam)];
 
       const response = await api.nba.getPlayers(options);
+      if (!response.data) {
+        throw new Error('Invalid response from players API');
+      }
       const newPlayers = Array.isArray(response.data) ? response.data : [];
+      
+      if (response.meta) {
+        setMeta(response.meta);
+        setHasMore(response.meta.current_page < response.meta.total_pages);
+      }
 
       const ids = newPlayers.map(p => p.id);
-      const statsRes = await api.nba.getPlayerStats({ player_ids: ids, season: 2023 });
-      const statsMap = new Map(statsRes.data.map(stats => [stats.player_id, stats]));
+      const statsRes = await api.nba.getStats({ 
+        player_ids: ids, 
+        seasons: [2023],
+        per_page: 100
+      });
+      
+      if (!statsRes.data) {
+        throw new Error('Invalid response from stats API');
+      }
+
+      const statsMap = new Map();
+      statsRes.data.forEach(stat => {
+        if (!statsMap.has(stat.player.id) || new Date(stat.game.date) > new Date(statsMap.get(stat.player.id).game.date)) {
+          statsMap.set(stat.player.id, stat);
+        }
+      });
 
       const playerStats = newPlayers.map(player => {
         const stats = statsMap.get(player.id);
@@ -156,10 +180,9 @@ export default function HomePage() {
       setPlayers(updatedPlayers);
       localStorage.setItem('cached_players', JSON.stringify(updatedPlayers));
       setPage(isLoadMore ? page + 1 : 1);
-      setHasMore(newPlayers.length === 10);
     } catch (err) {
       console.error("Failed to fetch players:", err);
-      setError("Failed to fetch players. Please try again later.");
+      setError(err.message || "Failed to fetch players. Please try again later.");
       if (!isLoadMore) setPlayers([]);
     } finally {
       setIsLoading(false);
@@ -254,7 +277,7 @@ export default function HomePage() {
                   onClick={() => fetchPlayers(true)}
                   className="btn-primary hover-shadow-glow"
                 >
-                  Load More Players
+                  Load More Players ({meta.current_page}/{meta.total_pages})
                 </button>
               </div>
             )}
