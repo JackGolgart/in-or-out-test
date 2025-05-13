@@ -373,4 +373,23 @@ export default function HomePage() {
                           <p className="text-sm text-gray-400">
                             Net Rating {player.season ? `(${player.season}-${player.season + 1})` : ''}
                           </p>
-                          <p className={`text-lg font-semibold ${getNetRatingColor(player.net_rating)}`
+                          <p className={`text-lg font-semibold ${getNetRatingColor(player.net_rating)}`}>
+                            {player.net_rating ? player.net_rating.toFixed(1) : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12">
+                    <p className="text-gray-400">No players found.</p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </Layout>
+  );
+}
