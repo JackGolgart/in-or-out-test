@@ -6,6 +6,18 @@ function getCurrentNBASeason() {
   return 2024;
 }
 
+function calculateAverages(games) {
+  if (!games.length) return {
+    points: 0, rebounds: 0, assists: 0, games_played: 0
+  };
+  return {
+    points: games.reduce((sum, g) => sum + (g.pts || 0), 0) / games.length,
+    rebounds: games.reduce((sum, g) => sum + (g.reb || 0), 0) / games.length,
+    assists: games.reduce((sum, g) => sum + (g.ast || 0), 0) / games.length,
+    games_played: games.length
+  };
+}
+
 export default async function handler(req, res) {
   // Set JSON content type for all responses
   res.setHeader('Content-Type', 'application/json');
@@ -14,7 +26,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { id } = req.query;
+  const { id, season } = req.query;
   if (!id) {
     return res.status(400).json({ error: 'Player ID is required' });
   }
@@ -22,7 +34,8 @@ export default async function handler(req, res) {
   try {
     const apiInstance = getApiClient();
     const currentSeason = getCurrentNBASeason();
-    console.log('Using season:', currentSeason);
+    const requestedSeason = season ? parseInt(season) : currentSeason;
+    console.log('Using season:', requestedSeason);
 
     // First, get the player's basic information
     console.log('Fetching player data for ID:', id);
@@ -43,83 +56,69 @@ export default async function handler(req, res) {
       initialTeam: player.team?.full_name
     });
 
-    // Get the player's most recent game to determine current team
-    console.log('Fetching most recent game for team info');
-    const recentStatsResponse = await apiInstance.nba.getStats({
-      player_ids: [id],
-      seasons: [currentSeason],
-      per_page: 1,
-      sort: ['-game.date']
-    });
-
-    // Update team information if we have recent game data
-    if (recentStatsResponse?.data?.length > 0) {
-      const recentGame = recentStatsResponse.data[0];
-      console.log('Recent game data:', {
-        date: recentGame.game.date,
-        team: recentGame.team?.full_name,
-        opponent: recentGame.game.home_team_id === recentGame.team.id ? 
-          'vs ' + recentGame.game.visitor_team_id : 
-          'at ' + recentGame.game.home_team_id
-      });
-
-      if (recentGame.team) {
-        console.log('Updating team info from recent game:', {
-          oldTeam: player.team?.full_name,
-          newTeam: recentGame.team.full_name
-        });
-        player.team = recentGame.team;
-      }
-    } else {
-      console.log('No recent games found for team update');
-    }
-
-    // Get all player stats for the current season
-    console.log('Fetching all player stats for season averages');
+    // Get all stats for the requested season (max 100 games)
     const statsResponse = await apiInstance.nba.getStats({
       player_ids: [id],
-      seasons: [currentSeason],
-      per_page: 25
+      seasons: [requestedSeason],
+      per_page: 100,
+      sort: ['-game.date']
     });
+    const allGames = statsResponse?.data || [];
 
-    let seasonAverages = {
-      points: 0,
-      rebounds: 0,
-      assists: 0,
-      games_played: 0
-    };
+    // Filter out preseason games (status === 'Preseason' or postseason === false and date before regular season start)
+    const regularGames = allGames.filter(g => !g.game.postseason && g.game.status !== 'Preseason');
+    const playoffGames = allGames.filter(g => g.game.postseason);
 
-    if (statsResponse?.data?.length > 0) {
-      const stats = statsResponse.data;
-      const totalGames = stats.length;
-      
-      seasonAverages = {
-        points: stats.reduce((sum, game) => sum + (game.pts || 0), 0) / totalGames,
-        rebounds: stats.reduce((sum, game) => sum + (game.reb || 0), 0) / totalGames,
-        assists: stats.reduce((sum, game) => sum + (game.ast || 0), 0) / totalGames,
-        games_played: totalGames
-      };
+    // Calculate averages
+    const regularAverages = calculateAverages(regularGames);
+    const playoffAverages = calculateAverages(playoffGames);
 
-      console.log('Calculated season averages:', {
-        games: totalGames,
-        points: seasonAverages.points.toFixed(1),
-        rebounds: seasonAverages.rebounds.toFixed(1),
-        assists: seasonAverages.assists.toFixed(1)
-      });
+    // For previous seasons, use API's season averages if not current season
+    let seasonAverages = regularAverages;
+    if (requestedSeason !== currentSeason) {
+      // Try to fetch season averages from API
+      try {
+        const avgRes = await fetch(`https://api.balldontlie.io/v1/season_averages?season=${requestedSeason}&player_ids[]=${id}`, {
+          headers: {
+            Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
+          },
+        });
+        if (avgRes.ok) {
+          const avgData = await avgRes.json();
+          if (avgData.data && avgData.data.length > 0) {
+            const avg = avgData.data[0];
+            seasonAverages = {
+              points: avg.pts ?? 0,
+              rebounds: avg.reb ?? 0,
+              assists: avg.ast ?? 0,
+              games_played: avg.games_played ?? 0
+            };
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching season averages:', err);
+      }
     }
 
-    // Get recent games (last 5)
-    const recentGames = statsResponse?.data?.slice(0, 5).map(game => ({
+    // Get most recent game for team info
+    let currentTeam = player.team;
+    if (regularGames.length > 0) {
+      const mostRecent = regularGames[0];
+      if (mostRecent.team) currentTeam = mostRecent.team;
+    }
+    player.team = currentTeam;
+
+    // Prepare recent games (last 5 regular season games)
+    const recentGames = regularGames.slice(0, 5).map(game => ({
       date: game.game.date,
-      opponent: game.game.home_team_id === game.team.id ? 
-        game.game.visitor_team_id : game.game.home_team_id,
+      opponent: game.game.home_team_id === game.team.id ? game.game.visitor_team_id : game.game.home_team_id,
       points: game.pts,
       rebounds: game.reb,
       assists: game.ast,
       minutes: game.min,
       result: game.game.home_team_score > game.game.visitor_team_score ? 'W' : 'L',
       score: `${game.game.home_team_score}-${game.game.visitor_team_score}`
-    })) || [];
+    }));
 
     console.log('Final player data:', {
       id: player.id,
@@ -133,6 +132,8 @@ export default async function handler(req, res) {
       player: {
         ...player,
         season_averages: seasonAverages,
+        regular_averages: regularAverages,
+        playoff_averages: playoffAverages,
         recent_games: recentGames
       }
     });

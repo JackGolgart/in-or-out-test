@@ -27,6 +27,7 @@ export default function PlayerPage() {
   const [player, setPlayer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showPlayoff, setShowPlayoff] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -34,12 +35,17 @@ export default function PlayerPage() {
     const fetchPlayerData = async () => {
       try {
         setLoading(true);
+        setError(null);
         const response = await fetch(`/api/players/${id}`);
         if (!response.ok) {
-          throw new Error('Failed to fetch player data');
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to fetch player data');
         }
         const data = await response.json();
-        setPlayer(data);
+        if (!data.player) {
+          throw new Error('Player data not found');
+        }
+        setPlayer(data.player);
       } catch (err) {
         console.error('Error fetching player:', err);
         setError(err.message);
@@ -104,128 +110,82 @@ export default function PlayerPage() {
     });
   };
 
+  // Choose which averages to show
+  const averages = showPlayoff ? player.playoff_averages : player.regular_averages;
+  const toggleLabel = showPlayoff ? 'Playoff Averages' : 'Regular Season Averages';
+
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
-        {/* Hero Section with gradient overlay */}
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-blue-600/20 to-transparent"></div>
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-            <div className="text-center">
-              <h1 className="text-4xl sm:text-5xl font-bold tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
-                {player.player.first_name} {player.player.last_name}
-              </h1>
-              <p className="text-lg text-gray-300 mt-4">
-                {player.player.position} — {player.player.team?.full_name}
-              </p>
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <Link href="/search" className={styles.backLink}>
+            ← Back to Search
+          </Link>
+          <h1>{player.first_name} {player.last_name}</h1>
+          <div className={styles.teamInfo}>
+            <h2>{player.team?.full_name || 'No Team'}</h2>
+            <p>#{player.jersey_number} | {player.position}</p>
+          </div>
+        </div>
+
+        {/* Switch for regular/playoff averages */}
+        <div className={styles.toggleRow}>
+          <span className={styles.toggleLabel}>Regular Season</span>
+          <label className={styles.switch}>
+            <input
+              type="checkbox"
+              checked={showPlayoff}
+              onChange={() => setShowPlayoff((v) => !v)}
+            />
+            <span className={styles.slider}></span>
+          </label>
+          <span className={styles.toggleLabel}>Playoffs</span>
+        </div>
+
+        <div className={styles.stats}>
+          <h3>{toggleLabel}</h3>
+          <div className={styles.statsGrid}>
+            <div className={styles.stat}>
+              <span className={styles.statValue}>{averages.points.toFixed(1)}</span>
+              <span className={styles.statLabel}>Points</span>
+            </div>
+            <div className={styles.stat}>
+              <span className={styles.statValue}>{averages.rebounds.toFixed(1)}</span>
+              <span className={styles.statLabel}>Rebounds</span>
+            </div>
+            <div className={styles.stat}>
+              <span className={styles.statValue}>{averages.assists.toFixed(1)}</span>
+              <span className={styles.statLabel}>Assists</span>
+            </div>
+            <div className={styles.stat}>
+              <span className={styles.statValue}>{averages.games_played}</span>
+              <span className={styles.statLabel}>Games</span>
             </div>
           </div>
         </div>
 
-        {/* Content Section */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 -mt-8">
-          <div className="space-y-8">
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="card-interactive">
-                <h2 className="text-purple-300 text-lg font-semibold mb-4">Season Averages</h2>
-                {player.seasonAverages ? (
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="space-y-3">
-                      <p className="text-gray-300">
-                        <span className="text-purple-300">Points:</span> {player.seasonAverages.pts}
-                      </p>
-                      <p className="text-gray-300">
-                        <span className="text-purple-300">Rebounds:</span> {player.seasonAverages.reb}
-                      </p>
-                      <p className="text-gray-300">
-                        <span className="text-purple-300">Assists:</span> {player.seasonAverages.ast}
-                      </p>
-                    </div>
-                    <div className="space-y-3">
-                      <p className="text-gray-300">
-                        <span className="text-purple-300">Minutes:</span> {player.seasonAverages.min}
-                      </p>
-                      <p className="text-gray-300">
-                        <span className="text-purple-300">Games:</span> {player.seasonAverages.games_played}
-                      </p>
-                      <p className="text-gray-300">
-                        <span className="text-purple-300">FG%:</span> {(player.seasonAverages.fg_pct * 100).toFixed(1)}%
-                      </p>
-                    </div>
+        <div className={styles.recentGames}>
+          <h3>Recent Games</h3>
+          {player.recent_games.length > 0 ? (
+            <div className={styles.gamesList}>
+              {player.recent_games.map((game, index) => (
+                <div key={index} className={styles.game}>
+                  <div className={styles.gameDate}>{formatDate(game.date)}</div>
+                  <div className={styles.gameResult}>
+                    <span className={styles.result}>{game.result}</span>
+                    <span className={styles.score}>{game.score}</span>
                   </div>
-                ) : (
-                  <p className="text-gray-400">No season stats available</p>
-                )}
-              </div>
-
-              <div className="card-interactive">
-                <h2 className="text-cyan-300 text-lg font-semibold mb-4">Player Info</h2>
-                <div className="space-y-3 text-sm">
-                  <p className="text-gray-300">
-                    <span className="text-cyan-300">Height:</span> {player.player.height}
-                  </p>
-                  <p className="text-gray-300">
-                    <span className="text-cyan-300">Weight:</span> {player.player.weight} lbs
-                  </p>
-                  <p className="text-gray-300">
-                    <span className="text-cyan-300">Jersey:</span> #{player.player.jersey_number}
-                  </p>
-                  <p className="text-gray-300">
-                    <span className="text-cyan-300">College:</span> {player.player.college || 'N/A'}
-                  </p>
-                  <p className="text-gray-300">
-                    <span className="text-cyan-300">Country:</span> {player.player.country}
-                  </p>
+                  <div className={styles.gameStats}>
+                    <span>{game.points} pts</span>
+                    <span>{game.rebounds} reb</span>
+                    <span>{game.assists} ast</span>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
-
-            {/* Recent Games */}
-            {player.gameStats && player.gameStats.length > 0 && (
-              <div className="card-interactive">
-                <h3 className="text-lg font-bold text-white mb-6">Recent Games</h3>
-                <Swiper
-                  modules={[Pagination, Autoplay]}
-                  spaceBetween={20}
-                  slidesPerView={1}
-                  pagination={{ clickable: true }}
-                  autoplay={{ delay: 3000, disableOnInteraction: false }}
-                  breakpoints={{
-                    640: { slidesPerView: 2 },
-                    1024: { slidesPerView: 3 }
-                  }}
-                  className="pb-10"
-                >
-                  {player.gameStats.map((game, index) => (
-                    <SwiperSlide key={index}>
-                      <div className="bg-gray-800/50 rounded-lg p-4 hover:bg-gray-800/70 transition-all duration-300">
-                        <p className="text-gray-400 text-sm mb-2">{formatDate(game.game.date)}</p>
-                        <p className="text-sm mb-1">
-                          <span className="text-gray-400">vs </span>
-                          <span className="text-white">{game.game.visitor_team_id === player.player.team.id ? game.game.home_team.abbreviation : game.game.visitor_team.abbreviation}</span>
-                        </p>
-                        <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
-                          <p className="text-gray-300">
-                            <span className="text-purple-300">PTS:</span> {game.pts}
-                          </p>
-                          <p className="text-gray-300">
-                            <span className="text-purple-300">REB:</span> {game.reb}
-                          </p>
-                          <p className="text-gray-300">
-                            <span className="text-purple-300">AST:</span> {game.ast}
-                          </p>
-                          <p className="text-gray-300">
-                            <span className="text-purple-300">MIN:</span> {game.min}
-                          </p>
-                        </div>
-                      </div>
-                    </SwiperSlide>
-                  ))}
-                </Swiper>
-              </div>
-            )}
-          </div>
+          ) : (
+            <p>No recent games available</p>
+          )}
         </div>
       </div>
     </Layout>
