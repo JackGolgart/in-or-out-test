@@ -65,7 +65,10 @@ export default function SearchPage() {
   const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
-    if (!query) return;
+    if (!query) {
+      router.push('/');
+      return;
+    }
 
     const fetchPlayers = async () => {
       setIsLoading(true);
@@ -85,7 +88,27 @@ export default function SearchPage() {
           throw new Error(data.error || 'Failed to fetch players');
         }
 
-        const newPlayers = Array.isArray(data.data) ? data.data : [];
+        if (!data.data || !Array.isArray(data.data)) {
+          console.error('Invalid API response:', data);
+          throw new Error('Invalid response format from server');
+        }
+
+        const newPlayers = data.data.filter(player => 
+          player && 
+          typeof player === 'object' && 
+          player.id && 
+          player.first_name && 
+          player.last_name && 
+          player.team
+        );
+
+        console.log('Search results:', {
+          query,
+          totalResults: data.data.length,
+          validResults: newPlayers.length,
+          firstPlayer: newPlayers[0]
+        });
+
         setPlayers(prev => page === 1 ? newPlayers : [...prev, ...newPlayers]);
         
         if (data.meta) {
@@ -94,13 +117,14 @@ export default function SearchPage() {
       } catch (err) {
         console.error('Search error:', err);
         setError(err.message);
+        setPlayers([]);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchPlayers();
-  }, [query, page]);
+  }, [query, page, router]);
 
   return (
     <Layout>
@@ -160,7 +184,13 @@ export default function SearchPage() {
                   ))
                 ) : (
                   <div className="col-span-full text-center py-12">
-                    <p className="text-gray-400">No players found</p>
+                    <p className="text-gray-400">No players found matching "{query}"</p>
+                    <button
+                      onClick={() => router.push('/')}
+                      className="mt-4 btn-primary"
+                    >
+                      Try a different search
+                    </button>
                   </div>
                 )}
               </div>

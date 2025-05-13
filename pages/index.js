@@ -23,14 +23,19 @@ export default function HomePage() {
     } else {
       setSearchMessage('');
     }
+  }, [query]);
 
-    const delay = setTimeout(() => {
-      if (query.length >= 3) {
-        router.push(`/search?q=${encodeURIComponent(query)}`);
-      }
-    }, 400);
-    return () => clearTimeout(delay);
-  }, [query, router]);
+  const handleSearch = () => {
+    if (query.length >= 3) {
+      router.push(`/search?q=${encodeURIComponent(query)}`);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
 
   return (
     <Layout>
@@ -50,14 +55,26 @@ export default function HomePage() {
               {/* Search Section */}
               <div className="max-w-3xl mx-auto">
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex-1">
+                  <div className="flex-1 relative">
                     <input
                       type="text"
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
+                      onKeyPress={handleKeyPress}
                       placeholder="Search players by name..."
-                      className="input-primary h-12"
+                      className="input-primary h-12 pr-12"
                     />
+                    <button
+                      onClick={handleSearch}
+                      disabled={query.length < 3}
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1 rounded-md transition-colors ${
+                        query.length >= 3
+                          ? 'bg-purple-600 text-white hover:bg-purple-700'
+                          : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                      }`}
+                    >
+                      Search
+                    </button>
                   </div>
                 </div>
                 {searchMessage && (
