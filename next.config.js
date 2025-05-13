@@ -2,10 +2,11 @@
 const nextConfig = {
   reactStrictMode: true,
   env: {
-    BALLDONTLIE_API_KEY: process.env.BALLDONTLIE_API_KEY,
+    NEXT_PUBLIC_BALLDONTLIE_API_KEY: process.env.BALLDONTLIE_API_KEY,
   },
   // Add proper error handling for missing environment variables
   webpack: (config, { isServer }) => {
+    // Only check on server startup
     if (isServer && !process.env.BALLDONTLIE_API_KEY) {
       console.error('\x1b[31m%s\x1b[0m', `
         Error: BALLDONTLIE_API_KEY environment variable is not set
@@ -18,4 +19,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig; 
+module.exports = nextConfig; 

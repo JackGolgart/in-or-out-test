@@ -13,43 +13,22 @@ import { trackComponentRender } from '../utils/performance';
 import { teams } from '../config/teams';
 
 const SearchSection = ({ query, setQuery, searchMessage }) => (
-  <div className="bg-gray-900/50 border-b border-gray-800 sticky top-[64px] z-10 backdrop-blur-sm">
-    <div className="max-w-7xl mx-auto px-4 py-6">
+  <div className="bg-gray-900/80 border-b border-gray-800 sticky top-16 z-10 backdrop-blur-sm">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
       <div className="flex flex-col space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold text-white">Search Players</h2>
         </div>
-        <div className="flex-1 max-w-2xl">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            <input
-              type="text"
-              className="w-full bg-gray-800/50 border border-gray-700 rounded-lg py-3 pl-10 pr-4 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-              placeholder="Search by player name (e.g., Luka, James)..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              autoComplete="off"
-              aria-label="Search players"
-              minLength={3}
-            />
-            {query && (
-              <button
-                onClick={() => setQuery('')}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white"
-                aria-label="Clear search"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
+        <div className="flex-1">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by player name..."
+            className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-transparent transition-all duration-300"
+          />
           {searchMessage && (
-            <p className="text-xs text-gray-500 mt-2 ml-1">{searchMessage}</p>
+            <p className="mt-2 text-sm text-gray-400">{searchMessage}</p>
           )}
         </div>
       </div>
@@ -140,89 +119,106 @@ export default function HomePage() {
   const fetchPlayers = async (isLoadMore = false) => {
     setIsLoading(true);
     setError(null);
-    try {
-      const params = new URLSearchParams({
-        per_page: '25',
-        page: isLoadMore ? (page + 1).toString() : '1',
-      });
-      
-      if (query.length > 2) params.append('search', query);
+    
+    const maxRetries = 3;
+    let currentTry = 0;
 
-      const response = await fetch(`/api/players?${params.toString()}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
-
-      let data;
+    while (currentTry < maxRetries) {
       try {
-        const text = await response.text();
+        const params = new URLSearchParams({
+          per_page: '25',
+          page: isLoadMore ? (page + 1).toString() : '1',
+        });
+        
+        if (query.length > 2) params.append('search', query);
+
+        const response = await fetch(`/api/players?${params.toString()}`, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        });
+
+        let data;
         try {
-          data = JSON.parse(text);
+          const text = await response.text();
+          try {
+            data = JSON.parse(text);
+          } catch (e) {
+            console.error('Failed to parse response as JSON:', text);
+            throw new Error('Invalid server response format');
+          }
         } catch (e) {
-          console.error('Failed to parse response as JSON:', text);
-          throw new Error('Invalid server response format');
+          console.error('Failed to read response:', e);
+          throw new Error('Failed to read server response');
         }
-      } catch (e) {
-        console.error('Failed to read response:', e);
-        throw new Error('Failed to read server response');
-      }
 
-      if (!response.ok) {
-        const errorMessage = typeof data.error === 'string' 
-          ? data.error 
-          : typeof data.error === 'object' 
-            ? JSON.stringify(data.error) 
-            : `Server error: ${response.status}`;
-        throw new Error(errorMessage);
-      }
-      
-      if (!data.data) {
-        console.error('Invalid response format:', data);
-        throw new Error('Invalid response format from server');
-      }
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            throw new Error('API key is invalid or missing. Please check your configuration.');
+          }
+          const errorMessage = typeof data.error === 'string' 
+            ? data.error 
+            : typeof data.error === 'object' 
+              ? JSON.stringify(data.error) 
+              : `Server error: ${response.status}`;
+          throw new Error(errorMessage);
+        }
+        
+        if (!data.data) {
+          console.error('Invalid response format:', data);
+          throw new Error('Invalid response format from server');
+        }
 
-      const newPlayers = Array.isArray(data.data) ? data.data : [];
-      
-      if (data.meta) {
-        setMeta(data.meta);
-        setHasMore(data.meta.current_page < data.meta.total_pages);
-      }
+        const newPlayers = Array.isArray(data.data) ? data.data : [];
+        
+        if (data.meta) {
+          setMeta(data.meta);
+          setHasMore(data.meta.current_page < data.meta.total_pages);
+        }
 
-      const updatedPlayers = isLoadMore ? [...players, ...newPlayers] : newPlayers;
-      setPlayers(updatedPlayers);
-      
-      // Only cache if we have valid data
-      if (updatedPlayers.length > 0) {
-        localStorage.setItem('cached_players', JSON.stringify(updatedPlayers));
+        const updatedPlayers = isLoadMore ? [...players, ...newPlayers] : newPlayers;
+        setPlayers(updatedPlayers);
+        
+        // Only cache if we have valid data
+        if (updatedPlayers.length > 0) {
+          localStorage.setItem('cached_players', JSON.stringify(updatedPlayers));
+        }
+        
+        setPage(isLoadMore ? page + 1 : 1);
+        break; // Success, exit the retry loop
+      } catch (err) {
+        console.error("Failed to fetch players:", err);
+        currentTry++;
+        
+        if (currentTry === maxRetries) {
+          const errorMessage = err.message && err.message !== '[object Object]'
+            ? err.message
+            : 'Failed to fetch players. Please try again later.';
+          setError(errorMessage);
+          if (!isLoadMore) setPlayers([]);
+        } else {
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, currentTry) * 1000));
+        }
       }
-      
-      setPage(isLoadMore ? page + 1 : 1);
-    } catch (err) {
-      console.error("Failed to fetch players:", err);
-      const errorMessage = err.message && err.message !== '[object Object]'
-        ? err.message
-        : 'Failed to fetch players. Please try again later.';
-      setError(errorMessage);
-      if (!isLoadMore) setPlayers([]);
-    } finally {
-      setIsLoading(false);
     }
+    
+    setIsLoading(false);
   };
 
   return (
     <Layout>
       <ErrorBoundary>
-        <div className="min-h-screen bg-gray-900">
+        <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950">
           {/* Header */}
-          <div className="relative bg-gray-900 border-b border-gray-800">
-            <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="relative bg-gray-900/95 border-b border-gray-800/50 backdrop-blur-sm">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
               <div className="flex flex-col space-y-2">
-                <h1 className="text-2xl font-bold text-white">
+                <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
                   NBA Player Analytics
                 </h1>
-                <p className="text-gray-400 text-sm">
+                <p className="text-gray-400 text-sm md:text-base">
                   Track performance metrics and discover insights
                 </p>
               </div>
@@ -237,9 +233,9 @@ export default function HomePage() {
           />
 
           {/* Content Section */}
-          <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {error && (
-              <div className="mb-6">
+              <div className="mb-8">
                 <div className="bg-red-900/20 border border-red-800/50 rounded-lg px-4 py-3">
                   <p className="text-red-400 text-sm flex items-center">
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -251,7 +247,7 @@ export default function HomePage() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {players.map(player => (
                 <PlayerCard
                   key={player.id}
@@ -262,19 +258,19 @@ export default function HomePage() {
             </div>
 
             {isLoading && (
-              <div className="flex justify-center items-center py-8">
+              <div className="flex justify-center items-center py-12">
                 <LoadingSpinner 
-                  size="md"
-                  message={players.length > 0 ? "Loading more..." : "Searching..."}
+                  size="lg"
+                  message={players.length > 0 ? "Loading more players..." : "Searching players..."}
                 />
               </div>
             )}
 
             {!isLoading && players.length > 0 && hasMore && (
-              <div className="text-center py-6">
+              <div className="text-center py-8">
                 <button
                   onClick={() => fetchPlayers(true)}
-                  className="bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 text-sm font-medium px-6 py-2 rounded-lg border border-purple-600/30 hover:border-purple-600/50 transition-all"
+                  className="bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 text-sm font-medium px-6 py-3 rounded-lg border border-purple-600/30 hover:border-purple-600/50 transition-all duration-300"
                 >
                   Load More ({meta.current_page}/{meta.total_pages})
                 </button>
@@ -282,13 +278,13 @@ export default function HomePage() {
             )}
 
             {!isLoading && players.length === 0 && !error && (
-              <div className="text-center py-12">
-                <div className="bg-gray-800/50 rounded-lg p-8 max-w-md mx-auto border border-gray-700/50">
-                  <svg className="w-12 h-12 text-gray-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="flex items-center justify-center py-16">
+                <div className="bg-gray-800/50 rounded-lg p-8 max-w-md w-full border border-gray-700/50 text-center">
+                  <svg className="w-12 h-12 text-gray-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
-                  <p className="text-gray-400 text-sm mb-1">No players found</p>
-                  <p className="text-gray-500 text-xs">Try adjusting your search criteria</p>
+                  <p className="text-gray-400 text-lg font-medium mb-2">No players found</p>
+                  <p className="text-gray-500 text-sm">Try adjusting your search criteria</p>
                 </div>
               </div>
             )}

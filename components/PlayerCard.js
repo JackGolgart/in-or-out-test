@@ -31,12 +31,11 @@ const LoadingSkeleton = () => (
   </div>
 );
 
-export default function PlayerCard({ player, isLoading }) {
-  const router = useRouter();
-  const { user } = useAuth();
+export default function PlayerCard({ player, onClick }) {
   const [renderStart] = useState(Date.now());
-  const [quickPickLoading, setQuickPickLoading] = useState(false);
-  const [currentPick, setCurrentPick] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
+  const [prediction, setPrediction] = useState(null);
 
   useEffect(() => {
     return () => {
@@ -45,156 +44,75 @@ export default function PlayerCard({ player, isLoading }) {
   }, [renderStart]);
 
   useEffect(() => {
-    const fetchCurrentPick = async () => {
-      if (!user || !player) return;
-      
-      const { data } = await supabase
-        .from('picks')
-        .select('selection')
-        .eq('user_id', user.id)
-        .eq('player_id', player.id)
-        .maybeSingle();
-
-      if (data) {
-        setCurrentPick(data.selection);
+    const fetchPrediction = async () => {
+      if (!user) return;
+      try {
+        const { data } = await supabase
+          .from('predictions')
+          .select('prediction')
+          .eq('player_id', player.id)
+          .eq('user_id', user.id)
+          .single();
+        setPrediction(data?.prediction);
+      } catch (error) {
+        console.error('Error fetching prediction:', error);
       }
     };
+    fetchPrediction();
+  }, [player.id, user]);
 
-    fetchCurrentPick();
-  }, [user, player]);
-
-  const handleQuickPick = async (selection) => {
-    if (!user || quickPickLoading) return;
-
-    try {
-      setQuickPickLoading(true);
-      const { error } = await supabase.from('picks').upsert({
-        user_id: user.id,
-        player_id: player.id,
-        player_name: `${player.first_name} ${player.last_name}`,
-        selection,
-        initial_net_rating: player.net_rating,
-      });
-
-      if (!error) {
-        setCurrentPick(selection);
-      }
-    } catch (error) {
-      console.error('Error making quick pick:', error);
-    } finally {
-      setQuickPickLoading(false);
-    }
-  };
-
-  if (isLoading) {
-    return <LoadingSkeleton />;
-  }
-
-  if (!player) return null;
+  if (!player) return <LoadingSkeleton />;
 
   return (
-    <div className="group relative">
-      <div className="p-4 bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:bg-gray-800/70 hover:border-purple-500/30">
-        {/* Quick actions */}
+    <div
+      onClick={onClick}
+      className="group bg-gray-800/50 hover:bg-gray-800/70 rounded-xl p-4 border border-gray-700/50 hover:border-purple-500/30 shadow-lg hover:shadow-purple-500/10 transition-all duration-300 cursor-pointer backdrop-blur-sm"
+    >
+      <div className="flex items-center space-x-4 mb-4">
+        <div className="relative flex-shrink-0">
+          <JerseyAvatar
+            teamAbbreviation={player.team?.abbreviation}
+            className="w-12 h-12 rounded-full"
+            onLoad={() => setIsLoading(false)}
+          />
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-800 rounded-full">
+              <LoadingSpinner size="sm" />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-white font-medium truncate group-hover:text-purple-400 transition-colors duration-300">
+            {player.first_name} {player.last_name}
+          </h3>
+          <p className="text-gray-400 text-sm truncate">
+            {player.position} • {player.team?.abbreviation}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <span className="text-sm font-medium px-2 py-1 rounded-md bg-gray-900/50 text-gray-300 border border-gray-700/30">
+            {player.team?.conference}
+          </span>
+        </div>
         {user && (
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex space-x-1">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleQuickPick('in');
-              }}
-              disabled={quickPickLoading || currentPick === 'in'}
-              className={`p-1.5 rounded-full transition-colors duration-200 ${
-                currentPick === 'in'
-                  ? 'bg-green-600/90 cursor-default'
-                  : quickPickLoading
-                  ? 'bg-gray-600/50 cursor-not-allowed'
-                  : 'bg-green-600/70 hover:bg-green-600'
-              }`}
-              title={
-                currentPick === 'in' 
-                  ? 'Already picked IN' 
-                  : quickPickLoading 
-                  ? 'Processing...' 
-                  : 'Quick Pick: IN'
-              }
-            >
-              <span className="sr-only">Pick IN</span>
-              {quickPickLoading ? (
-                <LoadingSpinner size="sm" light />
-              ) : (
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleQuickPick('out');
-              }}
-              disabled={quickPickLoading || currentPick === 'out'}
-              className={`p-1.5 rounded-full transition-colors duration-200 ${
-                currentPick === 'out'
-                  ? 'bg-red-600/90 cursor-default'
-                  : quickPickLoading
-                  ? 'bg-gray-600/50 cursor-not-allowed'
-                  : 'bg-red-600/70 hover:bg-red-600'
-              }`}
-              title={
-                currentPick === 'out' 
-                  ? 'Already picked OUT' 
-                  : quickPickLoading 
-                  ? 'Processing...' 
-                  : 'Quick Pick: OUT'
-              }
-            >
-              <span className="sr-only">Pick OUT</span>
-              {quickPickLoading ? (
-                <LoadingSpinner size="sm" light />
-              ) : (
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              )}
-            </button>
+          <div className="flex items-center space-x-2">
+            {prediction ? (
+              <span className={`px-3 py-1 rounded-lg text-sm font-medium ${
+                prediction === 'IN' 
+                  ? 'bg-green-900/20 text-green-400 border border-green-500/30' 
+                  : 'bg-red-900/20 text-red-400 border border-red-500/30'
+              }`}>
+                {prediction}
+              </span>
+            ) : (
+              <span className="px-3 py-1 rounded-lg text-sm font-medium bg-gray-900/50 text-gray-400 border border-gray-700/30">
+                No Pick
+              </span>
+            )}
           </div>
         )}
-
-        <div className="flex items-center space-x-4" onClick={() => router.push(`/player/${player.id}`)}>
-          <div className="flex-shrink-0">
-            <JerseyAvatar
-              teamAbbr={player.team.abbreviation}
-              firstName={player.first_name}
-              lastName={player.last_name}
-              size="sm"
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-white font-semibold truncate group-hover:text-purple-400 transition-colors duration-300">
-              {player.first_name} {player.last_name}
-            </h3>
-            <p className="text-gray-400 text-sm truncate">{player.team.full_name}</p>
-          </div>
-        </div>
-        
-        <div className="mt-3 flex items-center justify-between">
-          <div className="flex items-center space-x-1.5">
-            <span className="text-gray-400 text-xs uppercase tracking-wider">NET</span>
-            <span className={`text-base font-semibold ${
-              player.net_rating > 0 ? 'text-green-400' : 
-              player.net_rating < 0 ? 'text-red-400' : 'text-gray-400'
-            }`}>
-              {typeof player.net_rating === 'number' ? player.net_rating.toFixed(1) : 'N/A'}
-            </span>
-          </div>
-          <button
-            onClick={() => router.push(`/player/${player.id}`)}
-            className="px-4 py-1.5 text-sm bg-purple-600/80 hover:bg-purple-600 text-white rounded-lg transition-colors duration-300"
-          >
-            View Stats
-          </button>
-        </div>
       </div>
     </div>
   );
