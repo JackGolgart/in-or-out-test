@@ -21,19 +21,17 @@ export default async function handler(req, res) {
 
     // If not in cache, fetch fresh data
     const [playerRes, advancedStatsRes, seasonAveragesRes] = await Promise.all([
-      api.getPlayers({ player_ids: [parseInt(id)] }),
+      api.nba.getPlayer(parseInt(id)),
       fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${id}`, {
         headers: {
           Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
         },
       }),
-      api.getPlayerStats({ player_ids: [parseInt(id)] })
+      api.getPlayerStats(parseInt(id))
     ]);
 
     console.log('Player response:', {
       status: playerRes?.meta?.status,
-      totalCount: playerRes?.meta?.total_count,
-      dataLength: playerRes?.data?.length,
       data: playerRes?.data
     });
 
@@ -42,59 +40,10 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Invalid player data format' });
     }
 
-    if (!Array.isArray(playerRes.data)) {
-      console.error('Player data is not an array:', playerRes.data);
-      return res.status(500).json({ error: 'Invalid player data format' });
-    }
-
-    let player = playerRes.data[0];
+    const player = playerRes.data;
     if (!player) {
-      console.error('Player not found:', id, 'Response:', playerRes);
-      // Try fetching with search as fallback
-      try {
-        const searchRes = await api.getPlayers({ search: id.toString() });
-        console.log('Search response:', {
-          status: searchRes?.meta?.status,
-          totalCount: searchRes?.meta?.total_count,
-          dataLength: searchRes?.data?.length,
-          data: searchRes?.data
-        });
-        
-        if (searchRes?.data?.length > 0) {
-          const foundPlayer = searchRes.data.find(p => p.id === parseInt(id));
-          if (foundPlayer) {
-            player = foundPlayer;
-          }
-        }
-      } catch (searchError) {
-        console.error('Search fallback failed:', searchError);
-      }
-      
-      if (!player) {
-        // Try one more time with a different search approach
-        try {
-          const searchRes = await api.getPlayers({ search: id.toString(), per_page: 100 });
-          console.log('Extended search response:', {
-            status: searchRes?.meta?.status,
-            totalCount: searchRes?.meta?.total_count,
-            dataLength: searchRes?.data?.length,
-            data: searchRes?.data
-          });
-          
-          if (searchRes?.data?.length > 0) {
-            const foundPlayer = searchRes.data.find(p => p.id === parseInt(id));
-            if (foundPlayer) {
-              player = foundPlayer;
-            }
-          }
-        } catch (extendedSearchError) {
-          console.error('Extended search fallback failed:', extendedSearchError);
-        }
-        
-        if (!player) {
-          return res.status(404).json({ error: 'Player not found' });
-        }
-      }
+      console.error('Player not found:', id);
+      return res.status(404).json({ error: 'Player not found' });
     }
 
     let advancedStatsData = null;
