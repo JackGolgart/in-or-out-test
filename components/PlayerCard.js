@@ -93,109 +93,24 @@ export default function PlayerCard({ player, isLoading }) {
   if (!player) return null;
 
   return (
-    <div className="group relative">
-      <div className="p-4 bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:bg-gray-800/70 hover:border-purple-500/30">
-        {/* Quick actions */}
-        {user && (
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex space-x-1">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleQuickPick('in');
-              }}
-              disabled={quickPickLoading || currentPick === 'in'}
-              className={`p-1.5 rounded-full transition-colors duration-200 ${
-                currentPick === 'in'
-                  ? 'bg-green-600/90 cursor-default'
-                  : quickPickLoading
-                  ? 'bg-gray-600/50 cursor-not-allowed'
-                  : 'bg-green-600/70 hover:bg-green-600'
-              }`}
-              title={
-                currentPick === 'in' 
-                  ? 'Already picked IN' 
-                  : quickPickLoading 
-                  ? 'Processing...' 
-                  : 'Quick Pick: IN'
-              }
-            >
-              <span className="sr-only">Pick IN</span>
-              {quickPickLoading ? (
-                <LoadingSpinner size="sm" light />
-              ) : (
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleQuickPick('out');
-              }}
-              disabled={quickPickLoading || currentPick === 'out'}
-              className={`p-1.5 rounded-full transition-colors duration-200 ${
-                currentPick === 'out'
-                  ? 'bg-red-600/90 cursor-default'
-                  : quickPickLoading
-                  ? 'bg-gray-600/50 cursor-not-allowed'
-                  : 'bg-red-600/70 hover:bg-red-600'
-              }`}
-              title={
-                currentPick === 'out' 
-                  ? 'Already picked OUT' 
-                  : quickPickLoading 
-                  ? 'Processing...' 
-                  : 'Quick Pick: OUT'
-              }
-            >
-              <span className="sr-only">Pick OUT</span>
-              {quickPickLoading ? (
-                <LoadingSpinner size="sm" light />
-              ) : (
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              )}
-            </button>
-          </div>
-        )}
-
-        <div className="flex items-center space-x-4" onClick={() => router.push(`/player/${player.id}`)}>
-          <div className="flex-shrink-0">
-            <JerseyAvatar
-              teamAbbr={player.team.abbreviation}
-              firstName={player.first_name}
-              lastName={player.last_name}
-              size="sm"
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-white font-semibold truncate group-hover:text-purple-400 transition-colors duration-300">
-              {player.first_name} {player.last_name}
-            </h3>
-            <p className="text-gray-400 text-sm truncate">{player.team.full_name}</p>
-          </div>
-        </div>
-        
-        <div className="mt-3 flex items-center justify-between">
-          <div className="flex items-center space-x-1.5">
-            <span className="text-gray-400 text-xs uppercase tracking-wider">NET</span>
-            <span className={`text-base font-semibold ${
-              player.net_rating > 0 ? 'text-green-400' : 
-              player.net_rating < 0 ? 'text-red-400' : 'text-gray-400'
-            }`}>
-              {typeof player.net_rating === 'number' ? player.net_rating.toFixed(1) : 'N/A'}
-            </span>
-          </div>
-          <button
-            onClick={() => router.push(`/player/${player.id}`)}
-            className="px-4 py-1.5 text-sm bg-purple-600/80 hover:bg-purple-600 text-white rounded-lg transition-colors duration-300"
-          >
-            View Stats
-          </button>
-        </div>
+    <div className="p-4 bg-gray-800 rounded text-center shadow-md flex flex-col items-center transform transition-transform hover:scale-105">
+      <div className="mb-2">
+        <JerseyAvatar
+          teamAbbr={player.team?.abbreviation}
+          firstName={player.first_name}
+          lastName={player.last_name}
+        />
       </div>
+      <h3 className="text-white text-lg">{player.first_name} {player.last_name}</h3>
+      <p className="text-gray-400 text-xs">{player.team?.full_name}</p>
+      <p className="text-purple-300 text-sm mt-1">PER: {player.per ?? 'N/A'}</p>
+      <p className="text-gray-400 text-xs">Position: {player.position || 'N/A'}</p>
+      <button
+        onClick={() => router.push(`/player/${player.id}`)}
+        className="mt-2 px-4 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 transition-colors"
+      >
+        View Details
+      </button>
     </div>
   );
 }

@@ -2,40 +2,70 @@ import React from 'react';
 import TEAM_COLORS from '../lib/teamColors';
 import getTeamLogo from '../lib/teamLogos';
 
-const JerseyAvatar = ({ teamAbbr, firstName, lastName, className = '', size = 'md' }) => {
+export default function JerseyAvatar({ teamAbbr, firstName, lastName }) {
   const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
-  const teamColor = TEAM_COLORS[teamAbbr] || '#2D3748';
-  
-  const sizeClasses = {
-    sm: 'w-12 h-12 text-sm',
-    md: 'w-16 h-16 text-base',
-    lg: 'w-20 h-20 text-lg'
+  const colors = {
+    ATL: ['#E03A3E', '#C1D32F'],
+    BKN: ['#000000', '#FFFFFF'],
+    BOS: ['#007A33', '#BA9653'],
+    CHA: ['#1D1160', '#00788C'],
+    CHI: ['#CE1141', '#000000'],
+    CLE: ['#860038', '#041E42'],
+    DAL: ['#00538C', '#002B5E'],
+    DEN: ['#0E2240', '#FEC524'],
+    DET: ['#C8102E', '#1D42BA'],
+    GSW: ['#1D428A', '#FFC72C'],
+    HOU: ['#CE1141', '#000000'],
+    IND: ['#002D62', '#FDBB30'],
+    LAC: ['#C8102E', '#1D428A'],
+    LAL: ['#552583', '#FDB927'],
+    MEM: ['#5D76A9', '#12173F'],
+    MIA: ['#98002E', '#F9A01B'],
+    MIL: ['#00471B', '#EEE1C6'],
+    MIN: ['#0C2340', '#236192'],
+    NOP: ['#0C2340', '#C8102E'],
+    NYK: ['#006BB6', '#F58426'],
+    OKC: ['#007AC1', '#EF3B24'],
+    ORL: ['#0077C0', '#C4CED4'],
+    PHI: ['#006BB6', '#ED174C'],
+    PHX: ['#1D1160', '#E56020'],
+    POR: ['#E03A3E', '#000000'],
+    SAC: ['#5A2D81', '#63727A'],
+    SAS: ['#C4CED4', '#000000'],
+    TOR: ['#CE1141', '#000000'],
+    UTA: ['#002B5C', '#00471B'],
+    WAS: ['#002B5C', '#E31837']
   };
+
+  const [primary, secondary] = colors[teamAbbr] || ['#718096', '#4A5568'];
 
   return (
     <div 
-      className={`relative rounded-full overflow-hidden ${sizeClasses[size]} ${className}`}
+      className="relative w-20 h-20 transform transition-transform hover:scale-110"
       style={{
-        background: `linear-gradient(135deg, ${teamColor} 0%, rgba(0,0,0,0.3) 100%)`
+        background: `linear-gradient(135deg, ${primary} 0%, ${secondary} 100%)`,
+        borderRadius: '50%',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
       }}
     >
-      <div className="absolute inset-0 bg-black/10 backdrop-blur-[1px]"></div>
       <div 
-        className="absolute inset-0 opacity-10"
+        className="absolute inset-0 flex items-center justify-center text-white font-bold text-xl"
         style={{
-          backgroundImage: `url(${getTeamLogo(teamAbbr)})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center'
+          textShadow: '1px 1px 2px rgba(0, 0, 0, 0.3)',
         }}
-      ></div>
-      <div className="relative w-full h-full flex items-center justify-center">
-        <span className="text-white font-bold tracking-wider drop-shadow-lg">
-          {initials}
-        </span>
+      >
+        {initials}
+      </div>
+      <div 
+        className="absolute bottom-0 left-1/2 transform -translate-x-1/2 text-xs text-white bg-black bg-opacity-50 px-2 py-1 rounded-t-lg"
+        style={{
+          minWidth: '40px',
+          textAlign: 'center',
+        }}
+      >
+        {teamAbbr || 'NBA'}
       </div>
     </div>
   );
-};
-
-export default JerseyAvatar;
+}
 
