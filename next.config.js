@@ -2,6 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   env: {
+    BALLDONTLIE_API_KEY: process.env.BALLDONTLIE_API_KEY,
     NEXT_PUBLIC_BALLDONTLIE_API_KEY: process.env.BALLDONTLIE_API_KEY,
   },
   // Add proper error handling for missing environment variables

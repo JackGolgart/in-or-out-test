@@ -64,20 +64,15 @@ const handler = async (req, res) => {
   try {
     const { page = 1, per_page = 25, search = '' } = req.query;
 
-    // Log request details
-    console.log('API Request:', {
-      method: req.method,
-      query: req.query,
-      headers: req.headers,
-      env: {
-        hasApiKey: !!process.env.BALLDONTLIE_API_KEY,
-        nodeEnv: process.env.NODE_ENV
-      }
-    });
-
     // Validate API key
-    if (!process.env.BALLDONTLIE_API_KEY) {
-      return errorHandler(res, 500, 'API key not configured');
+    const apiKey = process.env.BALLDONTLIE_API_KEY;
+    if (!apiKey) {
+      console.error('API key missing in environment:', {
+        env: process.env.NODE_ENV,
+        hasKey: !!apiKey,
+        envVars: Object.keys(process.env).filter(key => key.includes('BALL')),
+      });
+      return errorHandler(res, 401, 'API key not configured');
     }
 
     // Initialize API client
@@ -89,16 +84,36 @@ const handler = async (req, res) => {
         throw new Error('Failed to initialize API client');
       }
     } catch (initError) {
-      console.error('API initialization error:', initError);
+      console.error('API initialization error:', {
+        error: initError,
+        hasKey: !!apiKey,
+        keyLength: apiKey?.length,
+      });
       return errorHandler(res, 500, 'Failed to initialize API client');
     }
 
-    // Fetch players
-    const response = await apiInstance.nba.getPlayers({
-      page: Math.max(1, parseInt(page)),
-      per_page: Math.min(100, Math.max(1, parseInt(per_page))),
-      search: search && typeof search === 'string' ? search.trim() : ''
-    });
+    // Fetch players with direct API call for better error handling
+    const playersResponse = await fetch(
+      `https://api.balldontlie.io/v2/players?page=${Math.max(1, parseInt(page))}&per_page=${Math.min(100, Math.max(1, parseInt(per_page)))}&search=${search}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!playersResponse.ok) {
+      const errorText = await playersResponse.text();
+      console.error('Ball Don\'t Lie API error:', {
+        status: playersResponse.status,
+        statusText: playersResponse.statusText,
+        error: errorText,
+      });
+      return errorHandler(res, playersResponse.status, `API Error: ${errorText}`);
+    }
+
+    const response = await playersResponse.json();
 
     if (!response || !response.data) {
       return errorHandler(res, 500, 'Invalid API response format');
@@ -106,48 +121,12 @@ const handler = async (req, res) => {
 
     const players = response.data;
 
-    // Fetch advanced stats for all players
-    let advancedStats = { data: [] };
-    try {
-      const advancedStatsRes = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/player_stats?select=player_id,net_rating`,
-        {
-          headers: {
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (!advancedStatsRes.ok) {
-        throw new Error(`Failed to fetch advanced stats: ${advancedStatsRes.statusText}`);
-      }
-
-      advancedStats = await advancedStatsRes.json();
-    } catch (statsError) {
-      console.warn('Error fetching advanced stats:', statsError);
-    }
-
-    // Combine player data with advanced stats
-    const playersWithNetRating = players.map(player => {
-      const stats = advancedStats.data?.find(stat => stat.player_id === player.id);
-      return {
-        ...player,
-        net_rating: stats?.net_rating ?? null,
-      };
-    });
-
-    // Log success
-    console.log('API Response success:', {
-      total: response.meta?.total_count,
-      current_page: response.meta?.current_page,
-      per_page: response.meta?.per_page,
-      players_with_ratings: playersWithNetRating.length
-    });
-
     // Send final response
     return res.status(200).json({
-      data: playersWithNetRating,
+      data: players.map(player => ({
+        ...player,
+        net_rating: null, // We'll fetch this separately if needed
+      })),
       meta: response.meta
     });
 
