@@ -7,15 +7,15 @@ export default async function handler(req, res) {
 
   try {
     const client = await getClient();
-    const response = await client.teams();
+    const teams = await client.teams();
     
-    if (!response || !response.data || !Array.isArray(response.data)) {
-      console.error('Invalid teams response:', response);
+    if (!teams || !Array.isArray(teams)) {
+      console.error('Invalid teams response:', teams);
       return res.status(500).json({ error: 'Invalid API response format' });
     }
     
     // Sort teams alphabetically by full name
-    const sortedTeams = response.data.sort((a, b) => a.full_name.localeCompare(b.full_name));
+    const sortedTeams = teams.sort((a, b) => a.full_name.localeCompare(b.full_name));
     
     res.status(200).json(sortedTeams);
   } catch (error) {

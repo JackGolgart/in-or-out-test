@@ -1,36 +1,42 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import getTeamLogo from '../lib/teamLogos';
 
-const JerseyAvatar = ({ teamAbbr, firstName, lastName, className = '', size = 'md', onLoad }) => {
-  const [teamColor, setTeamColor] = useState('#2D3748');
-  const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
-  
-  useEffect(() => {
-    const fetchTeamColor = async () => {
-      try {
-        const response = await fetch('/api/teams');
-        if (!response.ok) {
-          throw new Error(`Failed to fetch teams: ${response.status}`);
-        }
-        const teams = await response.json();
-        if (!Array.isArray(teams)) {
-          throw new Error('Invalid teams response format');
-        }
-        const team = teams.find(t => t.abbreviation === teamAbbr);
-        if (team?.primary_color) {
-          setTeamColor(team.primary_color);
-        }
-      } catch (error) {
-        console.error('Error fetching team color:', error);
-        // Use default color on error
-        setTeamColor('#2D3748');
-      }
-    };
+const teamColors = {
+  ATL: '#E03A3E',
+  BOS: '#007A33',
+  BKN: '#000000',
+  CHA: '#1D1160',
+  CHI: '#CE1141',
+  CLE: '#6F263D',
+  DAL: '#00538C',
+  DEN: '#0E2240',
+  DET: '#C8102E',
+  GSW: '#1D428A',
+  HOU: '#CE1141',
+  IND: '#002D62',
+  LAC: '#C8102E',
+  LAL: '#552583',
+  MEM: '#5D76A9',
+  MIA: '#98002E',
+  MIL: '#00471B',
+  MIN: '#0C2340',
+  NOP: '#0C2340',
+  NYK: '#006BB6',
+  OKC: '#007AC1',
+  ORL: '#0077C0',
+  PHI: '#006BB6',
+  PHX: '#1D1160',
+  POR: '#E03A3E',
+  SAC: '#5A2D81',
+  SAS: '#C4CED4',
+  TOR: '#CE1141',
+  UTA: '#002B5C',
+  WAS: '#002B5C',
+};
 
-    if (teamAbbr) {
-      fetchTeamColor();
-    }
-  }, [teamAbbr]);
+const JerseyAvatar = ({ teamAbbr, firstName, lastName, className = '', size = 'md', onLoad }) => {
+  const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
+  const teamColor = teamAbbr ? teamColors[teamAbbr] || '#2D3748' : '#2D3748';
   
   const sizeClasses = {
     sm: 'w-12 h-12 text-sm',
