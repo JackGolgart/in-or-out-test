@@ -1,5 +1,5 @@
-import api from '../../../lib/bdlClient';
-import { getPlayerFromCache, updatePlayerCache } from '../../../lib/playerCache';
+import api from '../../../../lib/bdlClient';
+import { getPlayerFromCache, updatePlayerCache } from '../../../../lib/playerCache';
 
 export default async function handler(req, res) {
   const { id } = req.query;
@@ -55,4 +55,4 @@ export default async function handler(req, res) {
     console.error('API error:', err);
     res.status(500).json({ error: 'Internal error' });
   }
-}
+} 

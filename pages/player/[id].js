@@ -28,7 +28,7 @@ export default function PlayerProfile() {
         // Fetch player details and history
         const [playerRes, historyRes] = await Promise.all([
           api.nba.getPlayers({ per_page: 1, search: id }),
-          fetch(`/api/player-history/${id}`)
+          fetch(`/api/players/${id}/history`)
         ]);
 
         if (!playerRes.data?.[0]) {
