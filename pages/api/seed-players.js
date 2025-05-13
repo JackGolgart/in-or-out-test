@@ -7,7 +7,18 @@ const supabase = createClient(
 
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
-async function fetchPlayerAdvancedStats(playerId, season = 2023) {
+// Function to get current NBA season
+function getCurrentNBASeason() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1; // JavaScript months are 0-based
+  
+  // NBA season starts in October (month 10)
+  // If we're before October, use previous year as the season start
+  return month < 10 ? year - 1 : year;
+}
+
+async function fetchPlayerAdvancedStats(playerId, season = getCurrentNBASeason()) {
   const res = await fetch(`https://api.balldontlie.io/v1/stats/advanced?player_ids[]=${playerId}&seasons[]=${season}&per_page=100`);
   const json = await res.json();
   return json.data;

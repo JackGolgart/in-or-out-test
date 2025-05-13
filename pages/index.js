@@ -235,6 +235,9 @@ export default function HomePage() {
         }
 
         const newPlayers = Array.isArray(data.data) ? data.data : [];
+        if (newPlayers.length > 0) {
+          console.log('First player from API:', newPlayers[0]);
+        }
         
         if (data.meta) {
           setHasMore(data.meta.current_page < data.meta.total_pages);

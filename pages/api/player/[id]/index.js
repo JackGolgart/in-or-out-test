@@ -1,0 +1,61 @@
+import api from '../../../lib/bdlClient';
+import { supabase } from '../../../lib/supabase';
+
+// Function to get current NBA season
+function getCurrentNBASeason() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1; // JavaScript months are 0-based
+  
+  // NBA season starts in October (month 10)
+  // If we're before October, use previous year as the season start
+  return month < 10 ? year - 1 : year;
+}
+
+export default async function handler(req, res) {
+  const { id } = req.query;
+  if (!id) return res.status(400).json({ error: 'Missing player ID' });
+
+  try {
+    const { data: cached, error: cacheError } = await supabase
+      .from('player_cache')
+      .select('*')
+      .eq('player_id', id)
+      .maybeSingle();
+
+    const isFresh = cached && cached.updated_at && Date.now() - new Date(cached.updated_at).getTime() < 86400000;
+
+    if (isFresh) {
+      return res.status(200).json({
+        player: cached.player,
+        seasonAverages: cached.season_averages,
+      });
+    }
+
+    const playerRes = await api.nba.getPlayer(parseInt(id));
+    if (!playerRes || !playerRes.data) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    const player = playerRes.data;
+    const currentSeason = getCurrentNBASeason();
+    const averages = await api.nba.getSeasonAverages({
+      player_ids: [parseInt(id)],
+      season: currentSeason,
+    });
+
+    const seasonAverages = averages.data.length > 0 ? averages.data[0] : null;
+
+    await supabase.from('player_cache').upsert({
+      player_id: player.id,
+      player,
+      season_averages: seasonAverages,
+      updated_at: new Date().toISOString(),
+    });
+
+    res.status(200).json({ player, seasonAverages });
+  } catch (err) {
+    console.error('API error:', err);
+    res.status(500).json({ error: 'Internal error' });
+  }
+} 

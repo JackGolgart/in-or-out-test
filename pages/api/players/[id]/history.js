@@ -1,10 +1,21 @@
+// Function to get current NBA season
+function getCurrentNBASeason() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1; // JavaScript months are 0-based
+  
+  // NBA season starts in October (month 10)
+  // If we're before October, use previous year as the season start
+  return month < 10 ? year - 1 : year;
+}
+
 export default async function handler(req, res) {
   const { id } = req.query;
   const apiKey = process.env.BALLDONTLIE_API_KEY;
   
   // Calculate seasons dynamically (last 6 seasons)
-  const currentYear = new Date().getFullYear();
-  const seasons = Array.from({ length: 6 }, (_, i) => currentYear - i).sort();
+  const currentSeason = getCurrentNBASeason();
+  const seasons = Array.from({ length: 6 }, (_, i) => currentSeason - i).sort();
   const history = [];
 
   for (let season of seasons) {

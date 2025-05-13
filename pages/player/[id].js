@@ -8,17 +8,27 @@ import api from '../../lib/bdlClient';
 import Layout from '../../components/Layout';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
-export default function PlayerProfile({ player, stats, gameStats, playerHistory }) {
+// Function to get current NBA season
+function getCurrentNBASeason() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1; // JavaScript months are 0-based
+  
+  // NBA season starts in October (month 10)
+  // If we're before October, use previous year as the season start
+  return month < 10 ? year - 1 : year;
+}
+
+export default function PlayerProfile({ player, stats, gameStats, playerHistory, error }) {
   const router = useRouter();
 
-  // Remove isFallback check since we're using getServerSideProps
-  if (!player) {
+  if (error || !player) {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-black to-gray-900 flex items-center justify-center">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-white mb-4">Player Not Found</h1>
-            <p className="text-gray-400">The player you're looking for doesn't exist or has been moved.</p>
+            <p className="text-gray-400">{error || 'The player you're looking for doesn't exist or has been moved.'}</p>
             <button 
               onClick={() => router.push('/')}
               className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
@@ -193,6 +203,7 @@ export default function PlayerProfile({ player, stats, gameStats, playerHistory 
 export async function getServerSideProps({ params }) {
   try {
     const { id } = params;
+    const currentSeason = getCurrentNBASeason();
     
     // Fetch player details and history
     const [playerRes, historyRes] = await Promise.all([
@@ -202,7 +213,13 @@ export async function getServerSideProps({ params }) {
 
     if (!playerRes.data?.[0]) {
       return {
-        notFound: true
+        props: {
+          error: 'Player not found',
+          player: null,
+          stats: null,
+          gameStats: [],
+          playerHistory: []
+        }
       };
     }
 
@@ -213,10 +230,10 @@ export async function getServerSideProps({ params }) {
     const [statsRes, advancedStatsRes] = await Promise.all([
       api.nba.getStats({ 
         player_ids: [id],
-        seasons: [2023],
+        seasons: [currentSeason],
         per_page: 100
       }),
-      fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${id}&seasons[]=${2023}&per_page=100`, {
+      fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${id}&seasons[]=${currentSeason}&per_page=100`, {
         headers: {
           Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
         },

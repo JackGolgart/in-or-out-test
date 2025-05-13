@@ -198,8 +198,21 @@ const handler = async (req, res) => {
       })
     );
 
+    // Ensure each player's team is a valid object
+    const normalizedPlayers = playersWithStats.map(player => {
+      if (!player || typeof player !== 'object') return player;
+      let team = player.team;
+      if (!team || typeof team !== 'object') {
+        team = { abbreviation: 'UNK', full_name: 'Unknown Team' };
+      } else {
+        if (!team.abbreviation) team.abbreviation = 'UNK';
+        if (!team.full_name) team.full_name = 'Unknown Team';
+      }
+      return { ...player, team };
+    });
+
     // Validate the response data
-    const validPlayers = playersWithStats.filter(player => 
+    const validPlayers = normalizedPlayers.filter(player => 
       player && 
       typeof player === 'object' && 
       player.id && 
@@ -212,6 +225,9 @@ const handler = async (req, res) => {
       console.error('No valid players found in response');
       return errorHandler(res, 500, 'No valid players found');
     }
+
+    // Debug: Log the first valid player before sending response
+    console.log('First valid player to be sent:', validPlayers[0]);
 
     // Send final response
     return res.status(200).json({
