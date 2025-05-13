@@ -1,7 +1,28 @@
 const { initializeApi } = require('../../../lib/bdlClient');
 
+// Error handler wrapper to ensure we never send HTML responses
+const errorHandler = (res, status, error) => {
+  // Ensure we're sending JSON
+  if (!res.headersSent) {
+    res.setHeader('Content-Type', 'application/json');
+  }
+  
+  // Log the error for debugging
+  console.error('API Error:', {
+    status,
+    error: error instanceof Error ? error.message : error,
+    stack: error instanceof Error ? error.stack : undefined
+  });
+
+  // Send a JSON response
+  return res.status(status).json({
+    error: error instanceof Error ? error.message : error,
+    timestamp: new Date().toISOString()
+  });
+};
+
 const handler = async (req, res) => {
-  // Ensure we always send JSON responses, even in case of errors
+  // Force JSON content type
   res.setHeader('Content-Type', 'application/json');
 
   // Add CORS headers
@@ -13,17 +34,20 @@ const handler = async (req, res) => {
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
   );
 
+  // Handle preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).json({ status: 'ok' });
   }
 
+  // Validate method
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return errorHandler(res, 405, 'Method not allowed');
   }
 
   try {
     const { page = 1, per_page = 25, search = '' } = req.query;
 
+    // Log request details
     console.log('API Request:', {
       method: req.method,
       query: req.query,
@@ -34,59 +58,40 @@ const handler = async (req, res) => {
       }
     });
 
-    // Check if API key is set
+    // Validate API key
     if (!process.env.BALLDONTLIE_API_KEY) {
-      console.error('BALLDONTLIE_API_KEY is not set in environment variables');
-      return res.status(500).json({
-        error: 'API configuration error',
-        details: 'API key is not configured',
-        env: process.env.NODE_ENV
-      });
+      return errorHandler(res, 500, 'API key not configured');
     }
 
-    console.log('Initializing API client...');
+    // Initialize API client
     let apiInstance;
     try {
+      console.log('Initializing API client...');
       apiInstance = initializeApi();
       console.log('API initialized successfully');
     } catch (initError) {
-      console.error('Failed to initialize API:', initError);
-      return res.status(500).json({
-        error: 'API initialization failed',
-        details: initError.message
-      });
+      return errorHandler(res, 500, 'Failed to initialize API client');
     }
 
-    console.log('Fetching players with params:', { page, per_page, search: search || undefined });
-
+    // Fetch players
     let response;
     try {
+      console.log('Fetching players with params:', { page, per_page, search: search || undefined });
       response = await apiInstance.nba.getPlayers({
         page: parseInt(page),
         per_page: parseInt(per_page),
         ...(search ? { search } : {})
       });
     } catch (apiError) {
-      console.error('NBA API request failed:', {
-        message: apiError.message,
-        status: apiError.status,
-        response: apiError.response
-      });
-      return res.status(500).json({
-        error: 'NBA API request failed',
-        details: apiError.message,
-        params: { page, per_page, search }
-      });
+      return errorHandler(res, 500, apiError);
     }
 
+    // Validate response
     if (!response || !response.data) {
-      console.error('Invalid API response:', response);
-      return res.status(500).json({
-        error: 'Invalid API response format',
-        details: 'Response missing data property'
-      });
+      return errorHandler(res, 500, 'Invalid API response format');
     }
 
+    // Log success
     console.log('Players API response:', {
       status: 'success',
       totalPlayers: response.meta?.total_count,
@@ -96,6 +101,7 @@ const handler = async (req, res) => {
 
     const players = Array.isArray(response.data) ? response.data : [];
 
+    // Handle empty results
     if (players.length === 0) {
       return res.status(200).json({ 
         data: [], 
@@ -107,7 +113,7 @@ const handler = async (req, res) => {
       });
     }
 
-    // Fetch advanced stats for NET rating
+    // Fetch advanced stats
     const ids = players.map(p => p.id);
     let advancedStats = { data: [] };
     
@@ -119,16 +125,15 @@ const handler = async (req, res) => {
       });
 
       if (!advancedStatsRes.ok) {
-        console.error('Advanced stats fetch failed:', advancedStatsRes.status);
-        // Don't throw, just log and continue with null net_ratings
+        console.warn('Advanced stats fetch failed:', advancedStatsRes.status);
       } else {
         advancedStats = await advancedStatsRes.json();
       }
     } catch (statsError) {
-      console.error('Error fetching advanced stats:', statsError);
-      // Don't throw, just log and continue with null net_ratings
+      console.warn('Error fetching advanced stats:', statsError);
     }
 
+    // Combine player data with advanced stats
     const playersWithNetRating = players.map(player => {
       const stats = advancedStats.data?.find(stat => stat.player_id === player.id);
       return {
@@ -137,7 +142,7 @@ const handler = async (req, res) => {
       };
     });
 
-    // Log successful response
+    // Log success
     console.log('API Response success:', {
       total: response.meta?.total_count,
       current_page: response.meta?.current_page,
@@ -145,6 +150,7 @@ const handler = async (req, res) => {
       players_with_ratings: playersWithNetRating.length
     });
 
+    // Send final response
     return res.status(200).json({
       data: playersWithNetRating,
       meta: {
@@ -154,19 +160,7 @@ const handler = async (req, res) => {
       }
     });
   } catch (error) {
-    // Catch any unexpected errors and ensure we return valid JSON
-    console.error('Unexpected error in players API:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    });
-    
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      details: error.message,
-      type: error.name,
-      timestamp: new Date().toISOString()
-    });
+    return errorHandler(res, 500, error);
   }
 };
 

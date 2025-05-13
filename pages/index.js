@@ -148,15 +148,34 @@ export default function HomePage() {
       
       if (query.length > 2) params.append('search', query);
 
-      const response = await fetch(`/api/players?${params.toString()}`);
-      const data = await response.json();
+      const response = await fetch(`/api/players?${params.toString()}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      let data;
+      try {
+        const text = await response.text();
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          console.error('Failed to parse response as JSON:', text);
+          throw new Error('Invalid server response format');
+        }
+      } catch (e) {
+        console.error('Failed to read response:', e);
+        throw new Error('Failed to read server response');
+      }
 
       if (!response.ok) {
-        throw new Error(data.message || `Error: ${response.status}`);
+        throw new Error(data.error || data.message || `Server error: ${response.status}`);
       }
       
       if (!data.data) {
-        throw new Error('Invalid response format');
+        console.error('Invalid response format:', data);
+        throw new Error('Invalid response format from server');
       }
 
       const newPlayers = Array.isArray(data.data) ? data.data : [];
