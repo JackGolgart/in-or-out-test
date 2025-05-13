@@ -55,7 +55,7 @@ async function fetchPlayerStats(api, playerId) {
     console.log(`Fetching stats for player ${playerId} for season ${currentSeason}`);
     
     // Fetch both regular stats and advanced stats
-    const [regularStats, advancedStats] = await Promise.all([
+    const [regularStats, advancedStatsRes] = await Promise.all([
       api.nba.getPlayerStats({
         player_ids: [playerId],
         seasons: [currentSeason]
@@ -64,17 +64,34 @@ async function fetchPlayerStats(api, playerId) {
         headers: {
           Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
         },
-      }).then(res => res.json())
+      })
     ]);
 
+    // Log the responses for debugging
+    console.log('Regular stats response:', {
+      hasData: !!regularStats?.data,
+      dataLength: regularStats?.data?.length,
+      firstPlayer: regularStats?.data?.[0]?.id
+    });
+
+    const advancedStats = await advancedStatsRes.json();
+    console.log('Advanced stats response:', {
+      hasData: !!advancedStats?.data,
+      dataLength: advancedStats?.data?.length,
+      firstPlayer: advancedStats?.data?.[0]?.player_id,
+      netRating: advancedStats?.data?.[0]?.net_rating
+    });
+
     if (!regularStats?.data?.[0]) {
+      console.log('No regular stats found for player:', playerId);
       return null;
     }
 
     const playerStats = regularStats.data[0];
     const advancedStatsData = advancedStats.data?.[0];
     
-    return {
+    // Log the final stats object
+    const stats = {
       net_rating: advancedStatsData?.net_rating || null,
       pts: playerStats.pts,
       reb: playerStats.reb,
@@ -82,6 +99,14 @@ async function fetchPlayerStats(api, playerId) {
       games_played: playerStats.games_played,
       season: currentSeason
     };
+    
+    console.log('Final stats object:', {
+      playerId,
+      netRating: stats.net_rating,
+      hasAdvancedStats: !!advancedStatsData
+    });
+
+    return stats;
   } catch (error) {
     console.error(`Error fetching stats for player ${playerId}:`, error);
     return null;

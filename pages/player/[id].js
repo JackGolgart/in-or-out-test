@@ -11,12 +11,21 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 export default function PlayerProfile({ player, stats, gameStats, playerHistory }) {
   const router = useRouter();
 
-  // Show loading state while the page is being generated
-  if (router.isFallback) {
+  // Remove isFallback check since we're using getServerSideProps
+  if (!player) {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-black to-gray-900 flex items-center justify-center">
-          <LoadingSpinner size="lg" message="Loading player data..." />
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-white mb-4">Player Not Found</h1>
+            <p className="text-gray-400">The player you're looking for doesn't exist or has been moved.</p>
+            <button 
+              onClick={() => router.push('/')}
+              className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              Return to Home
+            </button>
+          </div>
         </div>
       </Layout>
     );
@@ -181,14 +190,7 @@ export default function PlayerProfile({ player, stats, gameStats, playerHistory 
   );
 }
 
-export async function getStaticPaths() {
-  return {
-    paths: [], // Don't pre-render any paths at build time
-    fallback: true // Enable ISR for paths not generated at build time
-  };
-}
-
-export async function getStaticProps({ params }) {
+export async function getServerSideProps({ params }) {
   try {
     const { id } = params;
     
@@ -252,11 +254,10 @@ export async function getStaticProps({ params }) {
         stats: combinedStats,
         gameStats: recentGames,
         playerHistory: history
-      },
-      revalidate: 60 * 60 // Revalidate every hour
+      }
     };
   } catch (error) {
-    console.error('Error in getStaticProps:', error);
+    console.error('Error fetching player data:', error);
     return {
       notFound: true
     };

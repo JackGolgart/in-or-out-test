@@ -57,39 +57,49 @@ const getNetRatingColor = (rating) => {
   return 'text-yellow-400';
 };
 
-const PlayerCard = ({ player, onClick }) => (
-  <div 
-    onClick={onClick}
-    className="card-interactive group cursor-pointer"
-  >
-    <div className="flex items-center justify-between">
-      <div className="flex items-center space-x-4">
-        <JerseyAvatar
-          teamAbbr={player.team.abbreviation}
-          firstName={player.first_name}
-          lastName={player.last_name}
-          size="sm"
-        />
-        <div>
-          <h3 className="text-lg font-semibold text-white group-hover:text-purple-300 transition-colors duration-300">
-            {player.first_name} {player.last_name}
-          </h3>
+const PlayerCard = ({ player, onClick }) => {
+  // Add debugging
+  console.log('PlayerCard render:', {
+    playerId: player.id,
+    playerName: `${player.first_name} ${player.last_name}`,
+    netRating: player.net_rating,
+    hasNetRating: player.net_rating !== undefined && player.net_rating !== null
+  });
+
+  return (
+    <div 
+      onClick={onClick}
+      className="card-interactive group cursor-pointer"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <JerseyAvatar
+            teamAbbr={player.team.abbreviation}
+            firstName={player.first_name}
+            lastName={player.last_name}
+            size="sm"
+          />
+          <div>
+            <h3 className="text-lg font-semibold text-white group-hover:text-purple-300 transition-colors duration-300">
+              {player.first_name} {player.last_name}
+            </h3>
+            <p className="text-sm text-gray-400">
+              {player.team.full_name}
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
           <p className="text-sm text-gray-400">
-            {player.team.full_name}
+            Net Rating {player.season ? `(${player.season}-${player.season + 1})` : ''}
+          </p>
+          <p className={`text-lg font-semibold ${getNetRatingColor(player.net_rating)}`}>
+            {player.net_rating !== undefined && player.net_rating !== null ? player.net_rating.toFixed(1) : 'N/A'}
           </p>
         </div>
       </div>
-      <div className="text-right">
-        <p className="text-sm text-gray-400">
-          Net Rating {player.season ? `(${player.season}-${player.season + 1})` : ''}
-        </p>
-        <p className={`text-lg font-semibold ${getNetRatingColor(player.net_rating)}`}>
-          {player.net_rating ? player.net_rating.toFixed(1) : 'N/A'}
-        </p>
-      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default function HomePage() {
   const router = useRouter();
