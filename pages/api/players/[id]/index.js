@@ -2,13 +2,8 @@ import { getApiClient } from '../../../../lib/bdlClient';
 
 // Function to get current NBA season
 function getCurrentNBASeason() {
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth() + 1; // JavaScript months are 0-based
-  
-  // NBA season typically starts in October (month 10)
-  // If we're before October, use previous year as the season start
-  return currentMonth < 10 ? currentYear - 1 : currentYear;
+  // For the 2024-2025 season, we'll use 2024 as the season year
+  return 2024;
 }
 
 export default async function handler(req, res) {
