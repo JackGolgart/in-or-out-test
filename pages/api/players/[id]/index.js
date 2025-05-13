@@ -30,15 +30,17 @@ export default async function handler(req, res) {
 
     console.log('Fetching fresh player data for ID:', id);
 
-    // If not in cache, fetch fresh data using getPlayer
-    const playerRes = await api.nba.getPlayer(parseInt(id));
+    // If not in cache, fetch fresh data using getPlayers with specific ID
+    const playerRes = await api.nba.getPlayers({ 
+      player_ids: [parseInt(id)]
+    });
 
-    if (!playerRes?.data) {
+    if (!playerRes?.data?.[0]) {
       console.error('Player not found in API response:', { id, response: playerRes });
       return res.status(404).json({ error: 'Player not found' });
     }
 
-    const player = playerRes.data;
+    const player = playerRes.data[0];
     console.log('Found player from API:', { id: player.id, name: `${player.first_name} ${player.last_name}` });
 
     const currentSeason = getCurrentNBASeason();
