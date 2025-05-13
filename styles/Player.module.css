@@ -1,0 +1,239 @@
+.container {
+  min-height: 100vh;
+  padding: 2rem;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+  color: #ffffff;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  color: #ffffff;
+  text-decoration: none;
+  margin-bottom: 2rem;
+  font-size: 1.1rem;
+  transition: color 0.2s ease;
+}
+
+.backLink:hover {
+  color: #0070f3;
+}
+
+.playerInfo {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+@media (min-width: 768px) {
+  .playerInfo {
+    grid-template-columns: 300px 1fr;
+  }
+}
+
+.playerHeader {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 1rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.playerName {
+  font-size: 2.5rem;
+  font-weight: bold;
+  margin: 0;
+  color: #ffffff;
+}
+
+.playerTeam {
+  font-size: 1.5rem;
+  color: #0070f3;
+  margin: 0.5rem 0;
+}
+
+.playerDetails {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.detailItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.detailLabel {
+  font-size: 0.9rem;
+  color: #888;
+}
+
+.detailValue {
+  font-size: 1.1rem;
+  color: #ffffff;
+}
+
+.statsSection {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 1rem;
+  padding: 2rem;
+}
+
+.sectionTitle {
+  font-size: 1.8rem;
+  margin: 0 0 1.5rem 0;
+  color: #ffffff;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.statCard {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 0.8rem;
+  padding: 1.5rem;
+  text-align: center;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.statCard:hover {
+  transform: translateY(-5px);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.statValue {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #0070f3;
+  margin: 0;
+}
+
+.statLabel {
+  font-size: 1rem;
+  color: #888;
+  margin: 0.5rem 0 0 0;
+}
+
+.recentGames {
+  margin-top: 2rem;
+}
+
+.gameCard {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 0.8rem;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.gameCard:hover {
+  transform: translateX(5px);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.gameHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.gameDate {
+  font-size: 1.1rem;
+  color: #888;
+}
+
+.gameScore {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.gameStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 1rem;
+}
+
+.gameStat {
+  text-align: center;
+}
+
+.gameStatValue {
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: #0070f3;
+  margin: 0;
+}
+
+.gameStatLabel {
+  font-size: 0.9rem;
+  color: #888;
+  margin: 0.2rem 0 0 0;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+}
+
+.loadingSpinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #0070f3;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+  color: #ffffff;
+  text-align: center;
+  padding: 2rem;
+}
+
+.errorTitle {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.errorMessage {
+  font-size: 1.2rem;
+  color: #888;
+  margin-bottom: 2rem;
+}
+
+.errorButton {
+  background: #0070f3;
+  color: #ffffff;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.errorButton:hover {
+  background: #0051a8;
+} 
