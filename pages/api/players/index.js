@@ -189,16 +189,31 @@ const handler = async (req, res) => {
         per_page: Math.min(100, Math.max(1, parseInt(per_page)))
       };
 
-      // If it looks like a full name, try exact match first
+      // If it looks like a full name, try different formats
       if (cleanSearch.includes(' ')) {
         const [firstName, lastName] = cleanSearch.split(' ');
+        // Try both formats: "firstName lastName" and "lastName, firstName"
         searchParams.search = `${firstName} ${lastName}`;
+        console.log('Searching with full name formats:', {
+          format1: searchParams.search,
+          format2: `${lastName}, ${firstName}`,
+          original: cleanSearch
+        });
       } else {
         searchParams.search = cleanSearch;
+        console.log('Searching with single term:', searchParams.search);
       }
 
       console.log('Searching with params:', searchParams);
       response = await apiInstance.nba.getPlayers(searchParams);
+
+      // If no results with first format and it's a full name, try the other format
+      if ((!response?.data || response.data.length === 0) && cleanSearch.includes(' ')) {
+        const [firstName, lastName] = cleanSearch.split(' ');
+        searchParams.search = `${lastName}, ${firstName}`;
+        console.log('Trying alternative name format:', searchParams.search);
+        response = await apiInstance.nba.getPlayers(searchParams);
+      }
     } catch (error) {
       console.error('SDK Error:', {
         error,
@@ -209,6 +224,10 @@ const handler = async (req, res) => {
     }
 
     if (!response || !response.data) {
+      console.log('No response data from API:', {
+        searchQuery: cleanSearch,
+        response: response
+      });
       return res.status(200).json({
         data: [],
         meta: {
@@ -222,6 +241,15 @@ const handler = async (req, res) => {
     }
 
     const players = response.data;
+    console.log('Initial API response:', {
+      totalPlayers: players.length,
+      firstPlayer: players[0] ? {
+        id: players[0].id,
+        name: `${players[0].first_name} ${players[0].last_name}`,
+        team: players[0].team?.full_name
+      } : null,
+      searchQuery: cleanSearch
+    });
 
     // Initialize v2 API for advanced stats
     let apiV2;
@@ -270,6 +298,18 @@ const handler = async (req, res) => {
         return fullName.includes(cleanSearch) || 
                teamName.includes(cleanSearch) || 
                teamAbbr.includes(cleanSearch);
+      });
+
+      console.log('Filtered players:', {
+        totalPlayers: players.length,
+        activePlayers: activePlayers.length,
+        filteredPlayers: filteredPlayers.length,
+        searchQuery: cleanSearch,
+        firstPlayer: filteredPlayers[0] ? {
+          id: filteredPlayers[0].id,
+          name: `${filteredPlayers[0].first_name} ${filteredPlayers[0].last_name}`,
+          team: filteredPlayers[0].team?.full_name
+        } : null
       });
     }
 
