@@ -170,7 +170,12 @@ export default function HomePage() {
       }
 
       if (!response.ok) {
-        throw new Error(data.error || data.message || `Server error: ${response.status}`);
+        const errorMessage = typeof data.error === 'string' 
+          ? data.error 
+          : typeof data.error === 'object' 
+            ? JSON.stringify(data.error) 
+            : `Server error: ${response.status}`;
+        throw new Error(errorMessage);
       }
       
       if (!data.data) {
@@ -196,7 +201,10 @@ export default function HomePage() {
       setPage(isLoadMore ? page + 1 : 1);
     } catch (err) {
       console.error("Failed to fetch players:", err);
-      setError(err.message || "Failed to fetch players. Please try again later.");
+      const errorMessage = err.message && err.message !== '[object Object]'
+        ? err.message
+        : 'Failed to fetch players. Please try again later.';
+      setError(errorMessage);
       if (!isLoadMore) setPlayers([]);
     } finally {
       setIsLoading(false);

@@ -7,16 +7,33 @@ const errorHandler = (res, status, error) => {
     res.setHeader('Content-Type', 'application/json');
   }
   
+  // Format the error message
+  let errorMessage;
+  if (typeof error === 'string') {
+    errorMessage = error;
+  } else if (error instanceof Error) {
+    errorMessage = error.message;
+  } else if (typeof error === 'object') {
+    try {
+      errorMessage = JSON.stringify(error);
+    } catch {
+      errorMessage = 'Internal server error';
+    }
+  } else {
+    errorMessage = 'Internal server error';
+  }
+
   // Log the error for debugging
   console.error('API Error:', {
     status,
-    error: error instanceof Error ? error.message : error,
+    error: errorMessage,
+    originalError: error,
     stack: error instanceof Error ? error.stack : undefined
   });
 
-  // Send a JSON response
+  // Send a JSON response with a string error message
   return res.status(status).json({
-    error: error instanceof Error ? error.message : error,
+    error: errorMessage,
     timestamp: new Date().toISOString()
   });
 };
