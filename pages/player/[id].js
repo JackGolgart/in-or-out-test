@@ -32,12 +32,21 @@ export default function PlayerProfile() {
         const playerData = playerRes.data[0];
         setPlayer(playerData);
 
-        // Fetch player stats
-        const statsRes = await api.nba.getStats({ 
-          player_ids: [id],
-          seasons: [2023],
-          per_page: 100
-        });
+        // Fetch player stats and advanced stats
+        const [statsRes, advancedStatsRes] = await Promise.all([
+          api.nba.getStats({ 
+            player_ids: [id],
+            seasons: [2023],
+            per_page: 100
+          }),
+          fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${id}&seasons[]=${2023}&per_page=100`, {
+            headers: {
+              Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
+            },
+          })
+        ]);
+
+        const advancedStats = await advancedStatsRes.json();
 
         if (statsRes.data?.length > 0) {
           // Get the most recent stats
@@ -48,7 +57,13 @@ export default function PlayerProfile() {
             return latest;
           }, null);
 
-          setStats(mostRecentStats);
+          // Combine regular stats with advanced stats
+          const combinedStats = {
+            ...mostRecentStats,
+            ...advancedStats.data?.[0]
+          };
+
+          setStats(combinedStats);
           
           // Store last 10 games for the stats carousel
           const sortedGames = statsRes.data

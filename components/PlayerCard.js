@@ -9,22 +9,23 @@ import { trackComponentRender } from '../utils/performance';
 import LoadingSpinner from './LoadingSpinner';
 
 const LoadingSkeleton = () => (
-  <div className="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700">
-    <div className="animate-pulse space-y-4">
-      <div className="relative mx-auto w-24 h-24">
-        <div className="absolute inset-0 bg-gray-700 rounded-full overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-700 via-gray-600 to-gray-700 animate-shimmer" 
-               style={{ transform: 'translateX(-100%)' }}></div>
+  <div className="bg-gray-800/50 rounded-xl p-4 shadow-lg border border-gray-700/50">
+    <div className="animate-pulse space-y-3">
+      <div className="flex items-center space-x-4">
+        <div className="relative w-12 h-12">
+          <div className="absolute inset-0 bg-gray-700 rounded-full overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-700 via-gray-600 to-gray-700 animate-shimmer" 
+                 style={{ transform: 'translateX(-100%)' }}></div>
+          </div>
+        </div>
+        <div className="flex-1 space-y-2">
+          <div className="h-4 bg-gray-700 rounded w-3/4"></div>
+          <div className="h-3 bg-gray-700 rounded w-1/2"></div>
         </div>
       </div>
-      <div className="space-y-3 text-center">
-        <div className="h-6 bg-gray-700 rounded w-3/4 mx-auto"></div>
-        <div className="h-4 bg-gray-700 rounded w-1/2 mx-auto"></div>
-        <div className="flex items-center justify-center space-x-2 mt-4">
-          <div className="h-4 bg-gray-700 rounded w-8"></div>
-          <div className="h-4 bg-gray-700 rounded w-12"></div>
-        </div>
-        <div className="h-10 bg-gray-700 rounded-xl mt-4"></div>
+      <div className="flex justify-between items-center">
+        <div className="h-6 bg-gray-700 rounded w-16"></div>
+        <div className="h-8 bg-gray-700 rounded-lg w-24"></div>
       </div>
     </div>
   </div>
@@ -92,22 +93,22 @@ export default function PlayerCard({ player, isLoading }) {
   if (!player) return null;
 
   return (
-    <div className="group relative card-hover">
-      <div className="p-6 bg-gray-800 rounded-xl border border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:bg-gray-750">
+    <div className="group relative">
+      <div className="p-4 bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:bg-gray-800/70 hover:border-purple-500/30">
         {/* Quick actions */}
         {user && (
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex space-x-2">
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex space-x-1">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 handleQuickPick('in');
               }}
               disabled={quickPickLoading || currentPick === 'in'}
-              className={`p-2 rounded-full transition-colors duration-200 ${
+              className={`p-1.5 rounded-full transition-colors duration-200 ${
                 currentPick === 'in'
-                  ? 'bg-green-600 cursor-default'
+                  ? 'bg-green-600/90 cursor-default'
                   : quickPickLoading
-                  ? 'bg-gray-600 cursor-not-allowed'
+                  ? 'bg-gray-600/50 cursor-not-allowed'
                   : 'bg-green-600/70 hover:bg-green-600'
               }`}
               title={
@@ -122,8 +123,8 @@ export default function PlayerCard({ player, isLoading }) {
               {quickPickLoading ? (
                 <LoadingSpinner size="sm" light />
               ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
                 </svg>
               )}
             </button>
@@ -133,11 +134,11 @@ export default function PlayerCard({ player, isLoading }) {
                 handleQuickPick('out');
               }}
               disabled={quickPickLoading || currentPick === 'out'}
-              className={`p-2 rounded-full transition-colors duration-200 ${
+              className={`p-1.5 rounded-full transition-colors duration-200 ${
                 currentPick === 'out'
-                  ? 'bg-red-600 cursor-default'
+                  ? 'bg-red-600/90 cursor-default'
                   : quickPickLoading
-                  ? 'bg-gray-600 cursor-not-allowed'
+                  ? 'bg-gray-600/50 cursor-not-allowed'
                   : 'bg-red-600/70 hover:bg-red-600'
               }`}
               title={
@@ -152,29 +153,35 @@ export default function PlayerCard({ player, isLoading }) {
               {quickPickLoading ? (
                 <LoadingSpinner size="sm" light />
               ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               )}
             </button>
           </div>
         )}
 
-        <div className="flex flex-col items-center">
-          <div className="mb-4 transform transition-transform duration-300 group-hover:scale-110">
+        <div className="flex items-center space-x-4" onClick={() => router.push(`/player/${player.id}`)}>
+          <div className="flex-shrink-0">
             <JerseyAvatar
               teamAbbr={player.team.abbreviation}
               firstName={player.first_name}
               lastName={player.last_name}
+              size="sm"
             />
           </div>
-          <h3 className="text-white text-xl font-bold group-hover:text-purple-400 transition-colors duration-300">
-            {player.first_name} {player.last_name}
-          </h3>
-          <p className="text-gray-400 text-sm mt-1">{player.team.full_name}</p>
-          <div className="mt-3 flex items-center justify-center space-x-2">
-            <span className="text-gray-400 text-sm">NET</span>
-            <span className={`text-lg font-semibold ${
+          <div className="flex-1 min-w-0">
+            <h3 className="text-white font-semibold truncate group-hover:text-purple-400 transition-colors duration-300">
+              {player.first_name} {player.last_name}
+            </h3>
+            <p className="text-gray-400 text-sm truncate">{player.team.full_name}</p>
+          </div>
+        </div>
+        
+        <div className="mt-3 flex items-center justify-between">
+          <div className="flex items-center space-x-1.5">
+            <span className="text-gray-400 text-xs uppercase tracking-wider">NET</span>
+            <span className={`text-base font-semibold ${
               player.net_rating > 0 ? 'text-green-400' : 
               player.net_rating < 0 ? 'text-red-400' : 'text-gray-400'
             }`}>
@@ -183,9 +190,9 @@ export default function PlayerCard({ player, isLoading }) {
           </div>
           <button
             onClick={() => router.push(`/player/${player.id}`)}
-            className="mt-4 w-full btn-primary"
+            className="px-4 py-1.5 text-sm bg-purple-600/80 hover:bg-purple-600 text-white rounded-lg transition-colors duration-300"
           >
-            View Details
+            View Stats
           </button>
         </div>
       </div>
