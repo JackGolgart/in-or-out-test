@@ -28,7 +28,7 @@ export default function PlayerProfile({ player, stats, gameStats, playerHistory,
         <div className="min-h-screen bg-gradient-to-br from-black to-gray-900 flex items-center justify-center">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-white mb-4">Player Not Found</h1>
-            <p className="text-gray-400">{error || 'The player you're looking for doesn't exist or has been moved.'}</p>
+            <p className="text-gray-400">{error || "The player you're looking for doesn't exist or has been moved."}</p>
             <button 
               onClick={() => router.push('/')}
               className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"

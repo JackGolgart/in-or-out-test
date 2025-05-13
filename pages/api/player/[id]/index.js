@@ -1,5 +1,10 @@
-import api from '../../../lib/bdlClient';
-import { supabase } from '../../../lib/supabase';
+import api from '../../../../lib/bdlClient';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 // Function to get current NBA season
 function getCurrentNBASeason() {
