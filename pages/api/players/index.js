@@ -1,4 +1,4 @@
-import api, { initializeApi } from '../../../lib/bdlClient';
+const { initializeApi } = require('../../../lib/bdlClient');
 
 const handler = async (req, res) => {
   // Add CORS headers
@@ -21,7 +21,15 @@ const handler = async (req, res) => {
 
   const { page = 1, per_page = 25, search = '' } = req.query;
 
-  console.log('Calling getPlayers with params:', { page, per_page, search });
+  console.log('API Request:', {
+    method: req.method,
+    query: req.query,
+    headers: req.headers,
+    env: {
+      hasApiKey: !!process.env.BALLDONTLIE_API_KEY,
+      nodeEnv: process.env.NODE_ENV
+    }
+  });
 
   try {
     // Check if API key is set
@@ -29,10 +37,12 @@ const handler = async (req, res) => {
       console.error('BALLDONTLIE_API_KEY is not set in environment variables');
       return res.status(500).json({
         error: 'API configuration error',
-        details: 'API key is not configured'
+        details: 'API key is not configured',
+        env: process.env.NODE_ENV
       });
     }
 
+    console.log('Initializing API client...');
     const apiInstance = initializeApi();
     console.log('API initialized successfully');
 
@@ -42,9 +52,17 @@ const handler = async (req, res) => {
       page: parseInt(page),
       per_page: parseInt(per_page),
       ...(search ? { search } : {})
+    }).catch(error => {
+      console.error('NBA API request failed:', {
+        message: error.message,
+        status: error.status,
+        response: error.response
+      });
+      throw error;
     });
 
     if (!response || !response.data) {
+      console.error('Invalid API response:', response);
       throw new Error('Invalid API response format');
     }
 
@@ -117,18 +135,29 @@ const handler = async (req, res) => {
     });
   } catch (error) {
     console.error('Error in players API:', {
+      name: error.name,
       message: error.message,
       stack: error.stack,
-      params: { page, per_page, search }
+      params: { page, per_page, search },
+      cause: error.cause
     });
+    
+    // Check if it's an API error with response
+    if (error.response) {
+      console.error('API Error Response:', {
+        status: error.response.status,
+        data: error.response.data
+      });
+    }
     
     return res.status(500).json({ 
       error: 'Failed to fetch players',
       details: error.message,
       type: error.name,
-      params: { page, per_page, search }
+      params: { page, per_page, search },
+      timestamp: new Date().toISOString()
     });
   }
 };
 
-export default handler; 
+module.exports = handler; 
