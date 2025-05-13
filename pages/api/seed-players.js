@@ -19,7 +19,7 @@ function getCurrentNBASeason() {
 }
 
 async function fetchPlayerAdvancedStats(playerId, season = getCurrentNBASeason()) {
-  const res = await fetch(`https://api.balldontlie.io/v1/stats/advanced?player_ids[]=${playerId}&seasons[]=${season}&per_page=100`);
+  const res = await fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${playerId}&seasons[]=${season}&per_page=100`);
   const json = await res.json();
   return json.data;
 }
