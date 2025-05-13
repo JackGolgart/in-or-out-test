@@ -134,7 +134,7 @@ const handler = async (req, res) => {
 
   // Validate method
   if (req.method !== 'GET') {
-    return errorHandler(res, 405, 'Method not allowed');
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
@@ -147,14 +147,15 @@ const handler = async (req, res) => {
       apiKeyLength: process.env.BALLDONTLIE_API_KEY?.length,
       env: process.env.NODE_ENV,
       envVars: Object.keys(process.env).filter(key => key.includes('BALL')),
-      currentSeason
+      currentSeason,
+      searchQuery: search
     });
 
     // Initialize API client
     let apiInstance;
     try {
       console.log('Initializing API client...');
-      apiInstance = initializeApi();
+      apiInstance = initializeApi('v2');
       if (!apiInstance) {
         throw new Error('Failed to initialize API client');
       }
@@ -163,24 +164,41 @@ const handler = async (req, res) => {
         error: initError,
         stack: initError.stack,
       });
-      return errorHandler(res, 500, `Client initialization failed: ${initError.message}`);
+      return res.status(500).json({ error: `Client initialization failed: ${initError.message}` });
     }
 
-    // Use the SDK to fetch players
-    const response = await apiInstance.nba.getPlayers({
-      page: Math.max(1, parseInt(page)),
-      per_page: Math.min(100, Math.max(1, parseInt(per_page))),
-      ...(search && { search: search.trim() })
-    }).catch(error => {
+    // Clean and validate search query
+    const cleanSearch = search.trim().toLowerCase();
+    const hasSearch = cleanSearch.length > 0;
+
+    // Use the SDK to fetch players with search
+    let response;
+    try {
+      response = await apiInstance.nba.getPlayers({
+        page: Math.max(1, parseInt(page)),
+        per_page: Math.min(100, Math.max(1, parseInt(per_page))),
+        ...(hasSearch && { search: cleanSearch })
+      });
+    } catch (error) {
       console.error('SDK Error:', {
         error,
         stack: error.stack,
+        searchQuery: cleanSearch
       });
-      throw error;
-    });
+      return res.status(500).json({ error: 'Failed to fetch players from API' });
+    }
 
     if (!response || !response.data) {
-      return errorHandler(res, 500, 'Invalid API response format');
+      return res.status(200).json({
+        data: [],
+        meta: {
+          total_count: 0,
+          total_pages: 0,
+          current_page: parseInt(page),
+          per_page: parseInt(per_page)
+        },
+        message: hasSearch ? 'No players found matching your search' : 'No players found'
+      });
     }
 
     const players = response.data;
@@ -208,9 +226,23 @@ const handler = async (req, res) => {
       player.season === currentSeason
     );
 
+    // If we have a search query, perform additional client-side filtering
+    let filteredPlayers = activePlayers;
+    if (hasSearch) {
+      filteredPlayers = activePlayers.filter(player => {
+        const fullName = `${player.first_name} ${player.last_name}`.toLowerCase();
+        const teamName = player.team?.full_name?.toLowerCase() || '';
+        const teamAbbr = player.team?.abbreviation?.toLowerCase() || '';
+        
+        return fullName.includes(cleanSearch) || 
+               teamName.includes(cleanSearch) || 
+               teamAbbr.includes(cleanSearch);
+      });
+    }
+
     // Ensure each player's team is a valid object
-    const normalizedPlayers = activePlayers.map(player => {
-      if (!player || typeof player !== 'object') return player;
+    const normalizedPlayers = filteredPlayers.map(player => {
+      if (!player || typeof player !== 'object') return null;
       let team = player.team;
       if (!team || typeof team !== 'object') {
         team = { abbreviation: 'UNK', full_name: 'Unknown Team' };
@@ -219,7 +251,7 @@ const handler = async (req, res) => {
         if (!team.full_name) team.full_name = 'Unknown Team';
       }
       return { ...player, team };
-    });
+    }).filter(Boolean);
 
     // Validate the response data
     const validPlayers = normalizedPlayers.filter(player => 
@@ -232,8 +264,22 @@ const handler = async (req, res) => {
     );
 
     if (validPlayers.length === 0) {
-      console.error('No valid players found in response');
-      return errorHandler(res, 500, 'No valid players found');
+      console.log('No valid players found in response:', {
+        searchQuery: cleanSearch,
+        originalCount: players.length,
+        activeCount: activePlayers.length,
+        filteredCount: filteredPlayers.length
+      });
+      return res.status(200).json({
+        data: [],
+        meta: {
+          total_count: 0,
+          total_pages: 0,
+          current_page: parseInt(page),
+          per_page: parseInt(per_page)
+        },
+        message: hasSearch ? 'No active players found matching your search' : 'No active players found'
+      });
     }
 
     // Debug: Log the first valid player before sending response
@@ -243,9 +289,10 @@ const handler = async (req, res) => {
     return res.status(200).json({
       data: validPlayers,
       meta: {
-        ...response.meta,
         total_count: validPlayers.length,
-        total_pages: Math.ceil(validPlayers.length / parseInt(per_page))
+        total_pages: Math.ceil(validPlayers.length / parseInt(per_page)),
+        current_page: parseInt(page),
+        per_page: parseInt(per_page)
       }
     });
 
@@ -254,7 +301,7 @@ const handler = async (req, res) => {
       message: error.message,
       stack: error.stack,
     });
-    return errorHandler(res, 500, error.message || 'Failed to fetch players');
+    return res.status(500).json({ error: 'Failed to fetch players' });
   }
 };
 
