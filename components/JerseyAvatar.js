@@ -9,13 +9,21 @@ const JerseyAvatar = ({ teamAbbr, firstName, lastName, className = '', size = 'm
     const fetchTeamColor = async () => {
       try {
         const response = await fetch('/api/teams');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch teams: ${response.status}`);
+        }
         const teams = await response.json();
+        if (!Array.isArray(teams)) {
+          throw new Error('Invalid teams response format');
+        }
         const team = teams.find(t => t.abbreviation === teamAbbr);
         if (team?.primary_color) {
           setTeamColor(team.primary_color);
         }
       } catch (error) {
         console.error('Error fetching team color:', error);
+        // Use default color on error
+        setTeamColor('#2D3748');
       }
     };
 

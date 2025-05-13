@@ -31,12 +31,35 @@ export default async function handler(req, res) {
       })
     ]);
 
-    const player = playerRes.data.find(p => String(p.id) === id);
-    if (!player) return res.status(404).json({ error: 'Player not found' });
+    if (!playerRes.data || !Array.isArray(playerRes.data)) {
+      console.error('Invalid player response:', playerRes);
+      return res.status(500).json({ error: 'Invalid player data format' });
+    }
 
-    const advancedStats = await advancedStatsRes.json();
-    const advancedStatsData = advancedStats.data.length > 0 ? advancedStats.data[0] : null;
-    const seasonAverages = seasonAveragesRes.data.length > 0 ? seasonAveragesRes.data[0] : null;
+    const player = playerRes.data.find(p => String(p.id) === id);
+    if (!player) {
+      console.error('Player not found:', id);
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    let advancedStatsData = null;
+    try {
+      const advancedStats = await advancedStatsRes.json();
+      if (advancedStats.data && Array.isArray(advancedStats.data)) {
+        advancedStatsData = advancedStats.data[0] || null;
+      }
+    } catch (error) {
+      console.error('Error parsing advanced stats:', error);
+    }
+
+    let seasonAverages = null;
+    try {
+      if (seasonAveragesRes.data && Array.isArray(seasonAveragesRes.data)) {
+        seasonAverages = seasonAveragesRes.data[0] || null;
+      }
+    } catch (error) {
+      console.error('Error parsing season averages:', error);
+    }
 
     // Cache the new data
     const newData = {
@@ -53,6 +76,6 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error('API error:', err);
-    res.status(500).json({ error: 'Internal error' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 } 
