@@ -45,19 +45,42 @@ export default async function handler(req, res) {
 
     const currentSeason = getCurrentNBASeason();
 
-    // Get season averages
+    // Get season averages and advanced stats
     let seasonAverages = null;
+    let advancedStats = null;
     try {
-      const averages = await api.nba.getPlayerStats({
-        player_ids: [parseInt(id)],
-        seasons: [currentSeason]
-      });
+      const [averages, advancedStatsRes] = await Promise.all([
+        api.nba.getPlayerStats({
+          player_ids: [parseInt(id)],
+          seasons: [currentSeason]
+        }),
+        fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${id}&seasons[]=${currentSeason}&per_page=100`, {
+          headers: {
+            Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
+          },
+        })
+      ]);
+
       seasonAverages = averages.data?.[0] || null;
+      const advancedStatsData = await advancedStatsRes.json();
+      advancedStats = advancedStatsData.data?.[0] || null;
+
       if (seasonAverages) {
         console.log('Found season averages for player:', { id, season: currentSeason });
       }
+      if (advancedStats) {
+        console.log('Found advanced stats for player:', { id, season: currentSeason, netRating: advancedStats.net_rating });
+      }
     } catch (error) {
-      console.error('Error fetching season averages:', error);
+      console.error('Error fetching player stats:', error);
+    }
+
+    // Combine the stats
+    if (seasonAverages && advancedStats) {
+      seasonAverages = {
+        ...seasonAverages,
+        net_rating: advancedStats.net_rating
+      };
     }
 
     // Cache the results

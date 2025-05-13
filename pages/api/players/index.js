@@ -92,7 +92,7 @@ async function fetchPlayerStats(api, playerId) {
     
     // Log the final stats object
     const stats = {
-      net_rating: advancedStatsData?.net_rating || null,
+      net_rating: advancedStatsData?.net_rating ?? null,
       pts: playerStats.pts,
       reb: playerStats.reb,
       ast: playerStats.ast,
@@ -103,7 +103,8 @@ async function fetchPlayerStats(api, playerId) {
     console.log('Final stats object:', {
       playerId,
       netRating: stats.net_rating,
-      hasAdvancedStats: !!advancedStatsData
+      hasAdvancedStats: !!advancedStatsData,
+      advancedStatsData
     });
 
     return stats;
