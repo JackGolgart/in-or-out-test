@@ -101,18 +101,13 @@
     @apply card-base card-gradient card-swivel;
   }
 
-  /* Card animations */
-  .card-enter {
-    @apply opacity-0 translate-y-4;
+  /* Hero section */
+  .hero-gradient {
+    @apply bg-gradient-to-br from-blue-600/20 via-purple-600/10 to-transparent;
   }
-  .card-enter-active {
-    @apply opacity-100 translate-y-0 transition-all duration-300;
-  }
-  .card-exit {
-    @apply opacity-100;
-  }
-  .card-exit-active {
-    @apply opacity-0 translate-y-4 transition-all duration-300;
+
+  .hero-text-gradient {
+    @apply bg-gradient-to-r from-white via-purple-200 to-white bg-clip-text text-transparent;
   }
 
   /* Loading animations */

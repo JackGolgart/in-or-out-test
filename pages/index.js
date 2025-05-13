@@ -248,48 +248,53 @@ export default function HomePage() {
 
   return (
     <Layout>
-      <div className="min-h-screen">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
         {/* Hero Section */}
-        <div className="py-12 px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl font-bold text-white mb-4">
-            Pick Your Players
-          </h1>
-          <p className="text-gray-400 text-lg mb-8">
-            Search NBA players, filter by team, and track top picks!
-          </p>
-          
-          {/* Search Section */}
-          <div className="max-w-4xl mx-auto">
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search players by name..."
-                  className="input-primary"
-                />
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-blue-600/20 to-transparent"></div>
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
+            <div className="text-center">
+              <h1 className="text-4xl sm:text-5xl font-bold text-white mb-6">
+                Pick Your Players
+              </h1>
+              <p className="text-lg sm:text-xl text-gray-300 mb-12">
+                Search NBA players, filter by team, and track top picks!
+              </p>
+              
+              {/* Search Section */}
+              <div className="max-w-3xl mx-auto">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search players by name..."
+                      className="input-primary h-12"
+                    />
+                  </div>
+                  <select
+                    value={selectedTeam}
+                    onChange={(e) => setSelectedTeam(e.target.value)}
+                    className="input-primary h-12 sm:w-48"
+                  >
+                    {teams.map((team) => (
+                      <option key={team} value={team}>
+                        {team}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {searchMessage && (
+                  <p className="mt-2 text-sm text-gray-400">{searchMessage}</p>
+                )}
               </div>
-              <select
-                value={selectedTeam}
-                onChange={(e) => setSelectedTeam(e.target.value)}
-                className="input-primary max-w-[200px]"
-              >
-                {teams.map((team) => (
-                  <option key={team} value={team}>
-                    {team}
-                  </option>
-                ))}
-              </select>
             </div>
-            {searchMessage && (
-              <p className="mt-2 text-sm text-gray-400">{searchMessage}</p>
-            )}
           </div>
         </div>
 
-        {/* Players Section */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Content Section */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           {error ? (
             <div className="text-center py-12">
               <p className="text-red-400 mb-4">{error}</p>
@@ -304,10 +309,10 @@ export default function HomePage() {
             <>
               {/* Filter Tabs */}
               <div className="mb-8">
-                <h2 className="text-2xl font-bold text-white mb-4">
+                <h2 className="text-2xl font-bold text-white mb-6">
                   Trending Players
                 </h2>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <FilterButton
                     active={activeFilter === 'INS - 24H'}
                     onClick={() => setActiveFilter('INS - 24H')}
@@ -336,7 +341,7 @@ export default function HomePage() {
               </div>
 
               {/* Players Grid */}
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {isLoading && players.length === 0 ? (
                   Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="card-base animate-pulse">
@@ -351,41 +356,35 @@ export default function HomePage() {
                   ))
                 ) : players.length > 0 ? (
                   players.map((player) => (
-                    <div key={player.id} className="card-interactive">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <JerseyAvatar
-                            teamAbbr={player.team.abbreviation}
-                            firstName={player.first_name}
-                            lastName={player.last_name}
-                            size="sm"
-                          />
-                          <div>
-                            <h3 className="text-lg font-semibold text-white group-hover:text-purple-300 transition-colors duration-300">
-                              {player.first_name} {player.last_name}
-                            </h3>
-                            <p className="text-sm text-gray-400">
-                              {player.team.full_name}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-gray-400">
-                            Net Rating {player.season ? `(${player.season}-${player.season + 1})` : ''}
-                          </p>
-                          <p className={`text-lg font-semibold ${getNetRatingColor(player.net_rating)}`}>
-                            {player.net_rating ? player.net_rating.toFixed(1) : 'N/A'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                    <PlayerCard
+                      key={player.id}
+                      player={player}
+                      onClick={() => router.push(`/player/${player.id}`)}
+                    />
                   ))
                 ) : (
-                  <div className="text-center py-12">
-                    <p className="text-gray-400">No players found.</p>
+                  <div className="col-span-full text-center py-12">
+                    <p className="text-gray-400">No players found</p>
                   </div>
                 )}
               </div>
+
+              {/* Load More Button */}
+              {hasMore && players.length > 0 && (
+                <div className="text-center mt-12">
+                  <button
+                    onClick={() => fetchPlayers(true)}
+                    disabled={isLoading}
+                    className="btn-primary"
+                  >
+                    {isLoading ? (
+                      <LoadingSpinner size="sm" />
+                    ) : (
+                      'Load More Players'
+                    )}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
