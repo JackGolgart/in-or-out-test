@@ -85,67 +85,45 @@ const handler = async (req, res) => {
     try {
       console.log('Initializing API client...');
       apiInstance = initializeApi();
-      console.log('API initialized successfully');
+      if (!apiInstance) {
+        throw new Error('Failed to initialize API client');
+      }
     } catch (initError) {
+      console.error('API initialization error:', initError);
       return errorHandler(res, 500, 'Failed to initialize API client');
     }
 
     // Fetch players
-    let response;
-    try {
-      console.log('Fetching players with params:', { page, per_page, search: search || undefined });
-      response = await apiInstance.nba.getPlayers({
-        page: parseInt(page),
-        per_page: parseInt(per_page),
-        ...(search ? { search } : {})
-      });
-    } catch (apiError) {
-      return errorHandler(res, 500, apiError);
-    }
+    const response = await apiInstance.nba.getPlayers({
+      page: Math.max(1, parseInt(page)),
+      per_page: Math.min(100, Math.max(1, parseInt(per_page))),
+      search: search && typeof search === 'string' ? search.trim() : ''
+    });
 
-    // Validate response
     if (!response || !response.data) {
       return errorHandler(res, 500, 'Invalid API response format');
     }
 
-    // Log success
-    console.log('Players API response:', {
-      status: 'success',
-      totalPlayers: response.meta?.total_count,
-      currentPage: response.meta?.current_page,
-      playersReturned: response.data.length
-    });
+    const players = response.data;
 
-    const players = Array.isArray(response.data) ? response.data : [];
-
-    // Handle empty results
-    if (players.length === 0) {
-      return res.status(200).json({ 
-        data: [], 
-        meta: {
-          total_pages: response.meta?.total_pages || 0,
-          current_page: parseInt(page),
-          next_page: null
-        }
-      });
-    }
-
-    // Fetch advanced stats
-    const ids = players.map(p => p.id);
+    // Fetch advanced stats for all players
     let advancedStats = { data: [] };
-    
     try {
-      const advancedStatsRes = await fetch(`https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${ids.join(',')}&per_page=100`, {
-        headers: {
-          Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
-        },
-      });
+      const advancedStatsRes = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/player_stats?select=player_id,net_rating`,
+        {
+          headers: {
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
 
       if (!advancedStatsRes.ok) {
-        console.warn('Advanced stats fetch failed:', advancedStatsRes.status);
-      } else {
-        advancedStats = await advancedStatsRes.json();
+        throw new Error(`Failed to fetch advanced stats: ${advancedStatsRes.statusText}`);
       }
+
+      advancedStats = await advancedStatsRes.json();
     } catch (statsError) {
       console.warn('Error fetching advanced stats:', statsError);
     }
@@ -170,15 +148,13 @@ const handler = async (req, res) => {
     // Send final response
     return res.status(200).json({
       data: playersWithNetRating,
-      meta: {
-        total_pages: response.meta?.total_pages || 1,
-        current_page: parseInt(page),
-        next_page: parseInt(page) < (response.meta?.total_pages || 1) ? parseInt(page) + 1 : null
-      }
+      meta: response.meta
     });
+
   } catch (error) {
+    console.error('Unhandled API error:', error);
     return errorHandler(res, 500, error);
   }
 };
 
-module.exports = handler; 
+export default handler; 

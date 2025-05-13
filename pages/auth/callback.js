@@ -10,18 +10,55 @@ export default function AuthCallback() {
 
   useEffect(() => {
     const handleAuthCallback = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      try {
+        // Get the session and check for errors
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          throw sessionError;
+        }
 
-      if (error) {
-        console.error('Error during auth callback:', error);
-        router.push('/login?error=auth-callback-failed');
-        return;
-      }
+        if (!session) {
+          console.error('No session found after authentication');
+          throw new Error('Authentication failed - no session');
+        }
 
-      if (session) {
+        // Get user profile
+        const { data: profile, error: profileError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profileError && profileError.code !== 'PGRST116') { // Ignore "not found" error
+          console.error('Profile fetch error:', profileError);
+          throw profileError;
+        }
+
+        // Create profile if it doesn't exist
+        if (!profile) {
+          const { error: createError } = await supabase
+            .from('users')
+            .insert([{
+              id: session.user.id,
+              email: session.user.email,
+              username: session.user.email.split('@')[0]
+            }]);
+
+          if (createError) {
+            console.error('Profile creation error:', createError);
+            throw createError;
+          }
+        }
+
+        // Redirect to home page on success
         router.push('/');
-      } else {
-        router.push('/login');
+      } catch (error) {
+        console.error('Auth callback error:', error);
+        // Redirect to login with specific error message
+        const errorMessage = encodeURIComponent(error.message || 'Authentication failed');
+        router.push(`/login?error=${errorMessage}`);
       }
     };
 
