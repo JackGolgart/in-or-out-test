@@ -1,6 +1,17 @@
 import api from '../../../../lib/bdlClient';
 import { getPlayerFromCache, updatePlayerCache } from '../../../../lib/playerCache';
 
+// Function to get current NBA season
+function getCurrentNBASeason() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1; // JavaScript months are 0-based
+  
+  // NBA season starts in October (month 10)
+  // If we're before October, use previous year as the season start
+  return month < 10 ? year - 1 : year;
+}
+
 export default async function handler(req, res) {
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: 'Missing player ID' });
@@ -34,12 +45,16 @@ export default async function handler(req, res) {
     const currentSeason = getCurrentNBASeason();
 
     // Get season averages
-    const averages = await api.nba.getSeasonAverages({
-      player_ids: [parseInt(id)],
-      season: currentSeason,
-    });
-
-    const seasonAverages = averages.data.length > 0 ? averages.data[0] : null;
+    let seasonAverages = null;
+    try {
+      const averages = await api.nba.getPlayerStats({
+        player_ids: [parseInt(id)],
+        seasons: [currentSeason]
+      });
+      seasonAverages = averages.data?.[0] || null;
+    } catch (error) {
+      console.error('Error fetching season averages:', error);
+    }
 
     // Cache the results
     const newData = {

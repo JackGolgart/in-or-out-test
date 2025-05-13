@@ -203,15 +203,17 @@ export default function PlayerProfile({ player, stats, gameStats, playerHistory,
 export async function getServerSideProps({ params }) {
   try {
     const { id } = params;
+    console.log('Fetching player data for ID:', id);
     
     // Fetch player data from our API endpoint
     const playerRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/players/${id}`);
+    const playerData = await playerRes.json();
+    
     if (!playerRes.ok) {
-      const error = await playerRes.json();
-      console.error('Player API error:', error);
+      console.error('Player API error:', playerData);
       return {
         props: {
-          error: error.error || 'Failed to load player data',
+          error: playerData.error || 'Failed to load player data',
           player: null,
           stats: null,
           gameStats: [],
@@ -220,8 +222,9 @@ export async function getServerSideProps({ params }) {
       };
     }
 
-    const { player, seasonAverages } = await playerRes.json();
+    const { player, seasonAverages } = playerData;
     if (!player) {
+      console.error('Player not found in response:', playerData);
       return {
         props: {
           error: 'Player not found',
@@ -232,6 +235,12 @@ export async function getServerSideProps({ params }) {
         }
       };
     }
+
+    console.log('Successfully fetched player data:', {
+      id: player.id,
+      name: `${player.first_name} ${player.last_name}`,
+      hasStats: !!seasonAverages
+    });
 
     // Fetch player history
     const historyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/players/${id}/history`);
