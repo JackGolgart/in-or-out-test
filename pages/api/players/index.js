@@ -147,32 +147,6 @@ const handler = async (req, res) => {
       envVars: Object.keys(process.env).filter(key => key.includes('BALL'))
     });
 
-    // Try direct API call first
-    try {
-      console.log('Attempting direct API call...');
-      const directResponse = await fetch('https://api.balldontlie.io/v1/players?per_page=1', {
-        headers: {
-          'Authorization': `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!directResponse.ok) {
-        const errorText = await directResponse.text();
-        console.error('Direct API call failed:', {
-          status: directResponse.status,
-          statusText: directResponse.statusText,
-          error: errorText,
-        });
-        throw new Error(`Direct API call failed: ${errorText}`);
-      }
-
-      console.log('Direct API call successful');
-    } catch (directError) {
-      console.error('Direct API call error:', directError);
-      return errorHandler(res, 500, `API Key validation failed: ${directError.message}`);
-    }
-
     // Initialize API client
     let apiInstance;
     try {
@@ -211,17 +185,37 @@ const handler = async (req, res) => {
     // Fetch stats for each player in parallel
     const playersWithStats = await Promise.all(
       players.map(async (player) => {
-        const stats = await fetchPlayerStats(apiInstance, player.id);
-        return {
-          ...player,
-          ...stats
-        };
+        try {
+          const stats = await fetchPlayerStats(apiInstance, player.id);
+          return {
+            ...player,
+            ...stats
+          };
+        } catch (error) {
+          console.error(`Error fetching stats for player ${player.id}:`, error);
+          return player;
+        }
       })
     );
 
+    // Validate the response data
+    const validPlayers = playersWithStats.filter(player => 
+      player && 
+      typeof player === 'object' && 
+      player.id && 
+      player.first_name && 
+      player.last_name && 
+      player.team
+    );
+
+    if (validPlayers.length === 0) {
+      console.error('No valid players found in response');
+      return errorHandler(res, 500, 'No valid players found');
+    }
+
     // Send final response
     return res.status(200).json({
-      data: playersWithStats,
+      data: validPlayers,
       meta: response.meta
     });
 

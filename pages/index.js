@@ -60,11 +60,17 @@ const getNetRatingColor = (rating) => {
 const PlayerCard = ({ player, onClick }) => {
   // Add debugging
   console.log('PlayerCard render:', {
-    playerId: player.id,
-    playerName: `${player.first_name} ${player.last_name}`,
-    netRating: player.net_rating,
-    hasNetRating: player.net_rating !== undefined && player.net_rating !== null
+    playerId: player?.id,
+    playerName: player ? `${player.first_name} ${player.last_name}` : 'Unknown',
+    netRating: player?.net_rating,
+    hasNetRating: player?.net_rating !== undefined && player?.net_rating !== null,
+    team: player?.team
   });
+
+  if (!player || !player.id || !player.first_name || !player.last_name || !player.team) {
+    console.error('Invalid player data:', player);
+    return null;
+  }
 
   return (
     <div 
