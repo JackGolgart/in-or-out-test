@@ -55,7 +55,7 @@ async function fetchPlayerStats(api, playerId) {
     console.log(`Fetching stats for player ${playerId} for season ${currentSeason}`);
     
     // Fetch regular stats using v1 API
-    const regularStats = await api.nba.getPlayerStats({
+    const regularStats = await api.nba.getStats({
       player_ids: [playerId],
       seasons: [currentSeason]
     });
@@ -64,7 +64,8 @@ async function fetchPlayerStats(api, playerId) {
     console.log('Regular stats response:', {
       hasData: !!regularStats?.data,
       dataLength: regularStats?.data?.length,
-      firstPlayer: regularStats?.data?.[0]?.id
+      firstPlayer: regularStats?.data?.[0]?.id,
+      stats: regularStats?.data?.[0]
     });
 
     if (!regularStats?.data?.[0]) {
@@ -102,10 +103,10 @@ async function fetchPlayerStats(api, playerId) {
     // Log the final stats object
     const stats = {
       net_rating: advancedStatsData?.net_rating ?? null,
-      pts: playerStats.pts,
-      reb: playerStats.reb,
-      ast: playerStats.ast,
-      games_played: playerStats.games_played,
+      pts: playerStats.pts ?? 0,
+      reb: playerStats.reb ?? 0,
+      ast: playerStats.ast ?? 0,
+      games_played: playerStats.games_played ?? 0,
       season: currentSeason
     };
     
@@ -113,7 +114,8 @@ async function fetchPlayerStats(api, playerId) {
       playerId,
       netRating: stats.net_rating,
       hasAdvancedStats: !!advancedStatsData,
-      advancedStatsData
+      advancedStatsData,
+      stats
     });
 
     return stats;
@@ -276,10 +278,10 @@ const handler = async (req, res) => {
       })
     );
 
-    // Filter out players without current season stats
+    // Update the active players filter
     const activePlayers = playersWithStats.filter(player => 
       player && 
-      player.games_played > 0 && 
+      (player.games_played > 0 || player.pts > 0 || player.reb > 0 || player.ast > 0) && 
       player.season === currentSeason
     );
 
