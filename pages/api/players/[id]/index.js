@@ -82,10 +82,8 @@ export default async function handler(req, res) {
     const statsResponse = await apiInstance.nba.getStats({
       player_ids: [parseInt(id)],
       seasons: [currentSeason],
-      per_page: 82, // Regular season games
-      start_date: startDateStr,
-      end_date: endDateStr,
-      sort: ['-game.date']
+      per_page: 100, // Increased to ensure we get enough games
+      sort: ['-game.date'] // Sort by most recent first
     }).catch(error => {
       console.error('Error fetching player stats:', {
         error: error.message,
@@ -97,61 +95,40 @@ export default async function handler(req, res) {
     });
     const allGames = statsResponse?.data || [];
 
-    // Filter out preseason games and ensure we're only getting regular season games
-    const regularGames = allGames.filter(g => {
+    // Get today's date for filtering
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Filter games up to today's date
+    const recentGames = allGames.filter(g => {
       const gameDate = new Date(g.game.date);
-      const seasonStart = new Date(currentSeason, 9, 1); // October 1st
-      const seasonEnd = new Date(currentSeason + 1, 3, 15); // April 15th (end of regular season)
-      
-      return !g.game.postseason && 
-             gameDate >= seasonStart && 
-             gameDate <= seasonEnd &&
-             g.game.status !== 'Preseason';
+      return gameDate <= today;
     });
 
-    const playoffGames = allGames.filter(g => g.game.postseason);
+    // Check if most recent games are playoff games
+    const isInPlayoffs = recentGames.length > 0 && recentGames[0].game.postseason;
+
+    // Filter regular season and playoff games
+    const regularGames = recentGames.filter(g => !g.game.postseason);
+    const playoffGames = recentGames.filter(g => g.game.postseason);
 
     // Calculate averages
     const regularAverages = calculateAverages(regularGames);
     const playoffAverages = calculateAverages(playoffGames);
 
-    // For previous seasons, use API's season averages if not current season
-    let seasonAverages = regularAverages;
-    if (currentSeason !== currentSeason) {
-      // Try to fetch season averages from API
-      try {
-        const avgRes = await fetch(`https://api.balldontlie.io/v1/season_averages?season=${currentSeason}&player_ids[]=${id}`, {
-          headers: {
-            Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
-          },
-        });
-        if (avgRes.ok) {
-          const avgData = await avgRes.json();
-          if (avgData.data && avgData.data.length > 0) {
-            const avg = avgData.data[0];
-            seasonAverages = {
-              points: avg.pts ?? 0,
-              rebounds: avg.reb ?? 0,
-              assists: avg.ast ?? 0,
-              games_played: avg.games_played ?? 0
-            };
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching season averages:', err);
-      }
-    }
+    // Use playoff averages if player is in playoffs
+    let seasonAverages = isInPlayoffs ? playoffAverages : regularAverages;
 
     // Get most recent game for team info
     let currentTeam = player.team;
-    if (regularGames.length > 0) {
-      const mostRecent = regularGames[0];
+    if (recentGames.length > 0) {
+      const mostRecent = recentGames[0];
       if (mostRecent.team) currentTeam = mostRecent.team;
     }
     player.team = currentTeam;
 
-    // Prepare recent games (last 5 regular season games)
-    const recentGames = regularGames.slice(0, 5).map(game => ({
+    // Prepare recent games (last 5 games)
+    const lastFiveGames = recentGames.slice(0, 5).map(game => ({
       date: game.game.date,
       opponent: game.game.home_team_id === game.team.id ? game.game.visitor_team_id : game.game.home_team_id,
       points: game.pts,
@@ -159,7 +136,8 @@ export default async function handler(req, res) {
       assists: game.ast,
       minutes: game.min,
       result: game.game.home_team_score > game.game.visitor_team_score ? 'W' : 'L',
-      score: `${game.game.home_team_score}-${game.game.visitor_team_score}`
+      score: `${game.game.home_team_score}-${game.game.visitor_team_score}`,
+      isPlayoff: game.game.postseason
     }));
 
     console.log('Final player data:', {
@@ -167,7 +145,8 @@ export default async function handler(req, res) {
       name: `${player.first_name} ${player.last_name}`,
       team: player.team?.full_name,
       games: seasonAverages.games_played,
-      recentGames: recentGames.length
+      recentGames: lastFiveGames.length,
+      isInPlayoffs
     });
 
     return res.status(200).json({
@@ -176,7 +155,8 @@ export default async function handler(req, res) {
         season_averages: seasonAverages,
         regular_averages: regularAverages,
         playoff_averages: playoffAverages,
-        recent_games: recentGames
+        recent_games: lastFiveGames,
+        is_in_playoffs: isInPlayoffs
       }
     });
 

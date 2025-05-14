@@ -21,43 +21,28 @@ function getCurrentNBASeason() {
   return month < 10 ? year - 1 : year;
 }
 
-export default function PlayerPage() {
+export default function PlayerPage({ player, stats, gameStats, playerHistory, error }) {
   const router = useRouter();
-  const { id } = router.query;
-  const [player, setPlayer] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [showPlayoff, setShowPlayoff] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(error);
+  const [showPlayoffs, setShowPlayoffs] = useState(player?.is_in_playoffs || false);
+  const [playerData, setPlayerData] = useState(player);
+  const [seasonStats, setSeasonStats] = useState(stats);
+  const [recentGames, setRecentGames] = useState(gameStats);
+  const [history, setHistory] = useState(playerHistory);
 
+  // Update state when props change
   useEffect(() => {
-    if (!id) return;
+    if (player) {
+      setPlayerData(player);
+      setSeasonStats(stats);
+      setRecentGames(gameStats);
+      setHistory(playerHistory);
+      setShowPlayoffs(player.is_in_playoffs || false);
+    }
+  }, [player, stats, gameStats, playerHistory]);
 
-    const fetchPlayerData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await fetch(`/api/players/${id}`);
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to fetch player data');
-        }
-        const data = await response.json();
-        if (!data.player) {
-          throw new Error('Player data not found');
-        }
-        setPlayer(data.player);
-      } catch (err) {
-        console.error('Error fetching player:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPlayerData();
-  }, [id]);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
@@ -72,14 +57,14 @@ export default function PlayerPage() {
     );
   }
 
-  if (error) {
+  if (errorMessage) {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-red-400 mb-4">Error</h2>
-              <p className="text-gray-300 mb-8">{error}</p>
+              <p className="text-gray-300 mb-8">{errorMessage}</p>
               <Link href="/search" className="btn-primary">
                 Back to Search
               </Link>
@@ -90,7 +75,7 @@ export default function PlayerPage() {
     );
   }
 
-  if (!player) {
+  if (!playerData) {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
@@ -117,8 +102,8 @@ export default function PlayerPage() {
   };
 
   // Choose which averages to show
-  const averages = showPlayoff ? player.playoff_averages : player.regular_averages;
-  const toggleLabel = showPlayoff ? 'Playoff Averages' : 'Regular Season Averages';
+  const averages = showPlayoffs ? playerData.playoff_averages : playerData.regular_averages;
+  const toggleLabel = showPlayoffs ? 'Playoff Averages' : 'Regular Season Averages';
 
   return (
     <Layout>
@@ -134,11 +119,11 @@ export default function PlayerPage() {
             </div>
             <div className="text-center">
               <h1 className="text-4xl sm:text-5xl font-bold text-white mb-4">
-                {player.first_name} {player.last_name}
+                {playerData.first_name} {playerData.last_name}
               </h1>
               <div className="text-lg text-gray-300">
-                <p className="mb-2">#{player.jersey_number} | {player.position}</p>
-                <p>{player.team?.full_name || 'No Team'}</p>
+                <p className="mb-2">#{playerData.jersey_number} | {playerData.position}</p>
+                <p>{playerData.team?.full_name || 'No Team'}</p>
               </div>
             </div>
           </div>
@@ -147,18 +132,24 @@ export default function PlayerPage() {
         {/* Stats Section */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           {/* Switch for regular/playoff averages */}
-          <div className="flex items-center justify-center mb-8">
-            <span className="text-gray-400 mr-4">Regular Season</span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showPlayoff}
-                onChange={() => setShowPlayoff((v) => !v)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-            </label>
-            <span className="text-gray-400 ml-4">Playoffs</span>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-white">Season Averages</h2>
+            <div className="flex items-center space-x-2">
+              <span className="text-white">Regular Season</span>
+              <button
+                onClick={() => setShowPlayoffs(!showPlayoffs)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                  showPlayoffs ? 'bg-purple-600' : 'bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    showPlayoffs ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className="text-white">Playoffs</span>
+            </div>
           </div>
 
           {/* Stats Grid */}
@@ -184,9 +175,9 @@ export default function PlayerPage() {
           {/* Recent Games */}
           <div className="card-base p-6">
             <h3 className="text-xl font-semibold text-white mb-6">Recent Games</h3>
-            {player.recent_games.length > 0 ? (
+            {recentGames.length > 0 ? (
               <div className="space-y-4">
-                {player.recent_games.map((game, index) => (
+                {recentGames.map((game, index) => (
                   <div key={index} className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
                     <div className="flex-1">
                       <div className="text-gray-400 text-sm">{formatDate(game.date)}</div>
