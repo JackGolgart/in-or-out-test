@@ -110,7 +110,8 @@ export default async function handler(req, res) {
       firstGame: allGames[0] ? {
         date: allGames[0].game.date,
         isPlayoff: allGames[0].game.postseason,
-        status: allGames[0].game.status
+        status: allGames[0].game.status,
+        team: allGames[0].team?.full_name
       } : null
     });
 
@@ -153,11 +154,25 @@ export default async function handler(req, res) {
       if (mostRecent.team) {
         console.log('Updating team from recent game:', {
           oldTeam: currentTeam?.full_name,
-          newTeam: mostRecent.team.full_name
+          newTeam: mostRecent.team.full_name,
+          gameDate: mostRecent.game.date
         });
         currentTeam = mostRecent.team;
       }
     }
+
+    // If we don't have a team from recent games, try to get it from the player's most recent game
+    if (!currentTeam && allGames.length > 0) {
+      const mostRecent = allGames[0];
+      if (mostRecent.team) {
+        console.log('Using team from most recent game:', {
+          team: mostRecent.team.full_name,
+          gameDate: mostRecent.game.date
+        });
+        currentTeam = mostRecent.team;
+      }
+    }
+
     player.team = currentTeam;
 
     // Prepare recent games (last 5 games)

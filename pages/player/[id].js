@@ -211,19 +211,25 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
   );
 }
 
-export async function getServerSideProps({ params }) {
+export async function getServerSideProps({ params, req }) {
   try {
     const { id } = params;
     console.log('Fetching player data for ID:', id);
     
+    // Get the base URL for API calls
+    const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
+    const host = req.headers.host;
+    const baseUrl = `${protocol}://${host}`;
+    
     // Fetch player data from our API endpoint
-    const playerRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/players/${id}`);
+    const playerRes = await fetch(`${baseUrl}/api/players/${id}`);
     if (!playerRes.ok) {
       const errorData = await playerRes.json();
       console.error('Player API error:', {
         status: playerRes.status,
         error: errorData,
-        playerId: id
+        playerId: id,
+        url: `${baseUrl}/api/players/${id}`
       });
       return {
         props: {
@@ -240,7 +246,8 @@ export async function getServerSideProps({ params }) {
     console.log('Player API response:', {
       hasPlayer: !!playerData?.player,
       hasStats: !!playerData?.player?.season_averages,
-      playerId: id
+      playerId: id,
+      team: playerData?.player?.team?.full_name
     });
 
     if (!playerData?.player) {
@@ -259,7 +266,7 @@ export async function getServerSideProps({ params }) {
     // Fetch player history
     let history = [];
     try {
-      const historyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/players/${id}/history`);
+      const historyRes = await fetch(`${baseUrl}/api/players/${id}/history`);
       if (historyRes.ok) {
         history = await historyRes.json();
       } else {
