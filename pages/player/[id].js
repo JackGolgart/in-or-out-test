@@ -36,28 +36,57 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
   const [prediction, setPrediction] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Filter recent games based on showPlayoffs state
-  const filteredRecentGames = useMemo(() => {
-    console.log('Filtering games:', {
-      totalGames: playerData?.recent_games?.length || 0,
-      showPlayoffs,
-      firstGame: playerData?.recent_games?.[0]
-    });
-
-    if (!playerData?.recent_games) return [];
-
-    return playerData.recent_games
-      .filter(game => {
-        const isPlayoff = game.isPlayoff === true;
-        console.log('Filtering game:', {
-          date: game.date,
-          isPlayoff,
-          showPlayoffs,
-          matches: isPlayoff === showPlayoffs
-        });
-        return isPlayoff === showPlayoffs;
+  // Update state when props change
+  useEffect(() => {
+    if (player) {
+      console.log('Initial player data:', {
+        id: player.id,
+        name: `${player.first_name} ${player.last_name}`,
+        regularNetRating: player.regular_net_rating,
+        playoffNetRating: player.playoff_net_rating,
+        hasRegularNetRating: player.regular_net_rating !== undefined && player.regular_net_rating !== null,
+        hasPlayoffNetRating: player.playoff_net_rating !== undefined && player.playoff_net_rating !== null,
+        allPlayerKeys: Object.keys(player),
+        fullPlayerData: JSON.stringify(player, null, 2)
       });
-  }, [playerData?.recent_games, showPlayoffs]);
+      setPlayerData(player);
+      setShowPlayoffs(false); // Default to regular season
+    }
+  }, [player]);
+
+  // Get the correct net rating based on game type
+  const currentNetRating = useMemo(() => {
+    if (!playerData) {
+      console.log('No player data available for net rating calculation');
+      return null;
+    }
+    const rating = showPlayoffs ? playerData.playoff_net_rating : playerData.regular_net_rating;
+    console.log('Net rating calculation:', {
+      showPlayoffs,
+      regularNetRating: playerData.regular_net_rating,
+      playoffNetRating: playerData.playoff_net_rating,
+      selectedRating: rating,
+      playerDataKeys: Object.keys(playerData),
+      fullPlayerData: JSON.stringify(playerData, null, 2)
+    });
+    return rating;
+  }, [playerData, showPlayoffs]);
+
+  // Debug log for currentNetRating and playerData
+  useEffect(() => {
+    console.log('DEBUG: currentNetRating value:', {
+      value: currentNetRating,
+      type: typeof currentNetRating,
+      isNull: currentNetRating === null,
+      isUndefined: currentNetRating === undefined,
+      playerData: {
+        regularNetRating: playerData?.regular_net_rating,
+        playoffNetRating: playerData?.playoff_net_rating,
+        showPlayoffs,
+        allKeys: playerData ? Object.keys(playerData) : []
+      }
+    });
+  }, [currentNetRating, playerData, showPlayoffs]);
 
   // Update averages based on showPlayoffs state
   const averages = useMemo(() => {
@@ -65,18 +94,11 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
     return showPlayoffs ? playerData.playoff_averages : playerData.regular_averages;
   }, [playerData, showPlayoffs]);
 
-  // Update state when props change
-  useEffect(() => {
-    if (playerData) {
-      console.log('Updating player data:', {
-        hasRegularGames: playerData.regular_averages?.games_played > 0,
-        hasPlayoffGames: playerData.playoff_averages?.games_played > 0,
-        regularGames: playerData.recent_games?.filter(g => !g.isPlayoff).length || 0,
-        playoffGames: playerData.recent_games?.filter(g => g.isPlayoff).length || 0
-      });
-      setShowPlayoffs(false); // Default to regular season
-    }
-  }, [playerData]);
+  // Filter recent games based on showPlayoffs state
+  const filteredRecentGames = useMemo(() => {
+    if (!playerData?.recent_games) return [];
+    return playerData.recent_games.filter(game => game.isPlayoff === showPlayoffs);
+  }, [playerData?.recent_games, showPlayoffs]);
 
   // Fetch prediction only when user or player ID changes
   useEffect(() => {
@@ -132,7 +154,7 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
       return;
     }
 
-    if (player?.net_rating === undefined || player?.net_rating === null) {
+    if (currentNetRating === undefined || currentNetRating === null) {
       console.error('Missing net rating data');
       setErrorMessage('Net rating data is not available for this player');
       return;
@@ -144,7 +166,7 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
       console.log('Prediction data:', {
         player_id: player.id,
         prediction_type: type,
-        net_rating: player.net_rating
+        net_rating: currentNetRating
       });
 
       const response = await fetch('/api/predictions', {
@@ -156,7 +178,7 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
         body: JSON.stringify({
           player_id: player.id,
           prediction_type: type,
-          net_rating: player.net_rating
+          net_rating: currentNetRating
         })
       });
 
@@ -221,8 +243,10 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
       console.log('Player data loaded:', {
         id: player.id,
         name: `${player.first_name} ${player.last_name}`,
-        netRating: player.net_rating,
-        hasNetRating: player.net_rating !== undefined && player.net_rating !== null
+        regularNetRating: player.regular_net_rating,
+        playoffNetRating: player.playoff_net_rating,
+        hasRegularNetRating: player.regular_net_rating !== undefined && player.regular_net_rating !== null,
+        hasPlayoffNetRating: player.playoff_net_rating !== undefined && player.playoff_net_rating !== null
       });
     }
   }, [player]);
@@ -321,10 +345,26 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
 
         {/* Stats Section */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          {/* Debug log for currentNetRating and playerData */}
+          {(() => {
+            console.log('DEBUG: currentNetRating value:', currentNetRating, 'type:', typeof currentNetRating);
+            console.log('DEBUG: playerData:', playerData);
+            return null;
+          })()}
           {/* Prediction Buttons */}
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-white mb-4">Make Your Prediction</h2>
-            {player?.net_rating === undefined || player?.net_rating === null ? (
+            {!user ? (
+              <div className="text-center py-4">
+                <p className="text-gray-400">Please log in to make predictions</p>
+                <button
+                  onClick={() => router.push('/login')}
+                  className="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  Log In
+                </button>
+              </div>
+            ) : currentNetRating === undefined || currentNetRating === null ? (
               <div className="text-center py-4">
                 <p className="text-gray-400">Net rating data is not available for this player</p>
                 <p className="text-sm text-gray-500 mt-2">
@@ -381,7 +421,11 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
               <span className="text-gray-400">Assists</span>
             </div>
             <div className="card-base p-6 text-center">
-              <span className="text-3xl font-bold text-white block mb-2">{playerData?.net_rating?.toFixed(1) || '0.0'}</span>
+              <span className="text-3xl font-bold text-white block mb-2">
+                {playerData?.regular_net_rating !== null && playerData?.regular_net_rating !== undefined
+                  ? playerData.regular_net_rating.toFixed(1)
+                  : '0.0'}
+              </span>
               <span className="text-gray-400">Net Rating</span>
             </div>
           </div>
@@ -464,11 +508,23 @@ export async function getServerSideProps({ params, req }) {
     const host = req.headers.host;
     const baseUrl = `${protocol}://${host}`;
     
+    console.log('Making API calls:', {
+      playerUrl: `${baseUrl}/api/players/${id}`,
+      historyUrl: `${baseUrl}/api/players/${id}/history`
+    });
+    
     // Fetch player data and history in parallel
     const [playerRes, historyRes] = await Promise.all([
       fetch(`${baseUrl}/api/players/${id}`),
       fetch(`${baseUrl}/api/players/${id}/history`)
     ]);
+
+    console.log('API responses:', {
+      playerStatus: playerRes.status,
+      playerOk: playerRes.ok,
+      historyStatus: historyRes.status,
+      historyOk: historyRes.ok
+    });
 
     if (!playerRes.ok) {
       const errorData = await playerRes.json();

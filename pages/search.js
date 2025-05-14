@@ -46,13 +46,25 @@ const PlayerCard = ({ player, onClick }) => {
             </div>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-400">
-            Net Rating {player.season ? `(${player.season}-${player.season + 1})` : ''}
-          </p>
-          <p className={`text-lg font-semibold ${getNetRatingColor(player.net_rating)}`}>
-            {player.net_rating !== undefined && player.net_rating !== null ? player.net_rating.toFixed(1) : 'N/A'}
-          </p>
+        <div className="flex space-x-6">
+          <div className="text-center">
+            <span className="text-white font-medium block">{player.pts?.toFixed(1) || '0.0'}</span>
+            <span className="text-gray-400 text-sm">PPG</span>
+          </div>
+          <div className="text-center">
+            <span className="text-white font-medium block">{player.reb?.toFixed(1) || '0.0'}</span>
+            <span className="text-gray-400 text-sm">RPG</span>
+          </div>
+          <div className="text-center">
+            <span className="text-white font-medium block">{player.ast?.toFixed(1) || '0.0'}</span>
+            <span className="text-gray-400 text-sm">APG</span>
+          </div>
+          <div className="text-center">
+            <span className={`text-white font-medium block ${getNetRatingColor(player.net_rating)}`}>
+              {player.net_rating !== undefined && player.net_rating !== null ? player.net_rating.toFixed(1) : '0.0'}
+            </span>
+            <span className="text-gray-400 text-sm">Net Rating</span>
+          </div>
         </div>
       </div>
     </div>

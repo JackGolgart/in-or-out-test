@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '../lib/AuthContext';
-import { supabase } from '../lib/supabase';
-import JerseyAvatar from './JerseyAvatar';
+import { useAuth } from '../contexts/AuthContext';
 import { trackComponentRender } from '../utils/performance';
 import LoadingSpinner from './LoadingSpinner';
+import JerseyAvatar from './JerseyAvatar';
+import { getNetRatingColor } from '../utils/colors';
 
 const LoadingSkeleton = () => (
   <div className="card-base">
@@ -36,6 +36,7 @@ export default function PlayerCard({ player, onClick }) {
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
   const [prediction, setPrediction] = useState(null);
+  const router = useRouter();
 
   useEffect(() => {
     return () => {
@@ -45,21 +46,83 @@ export default function PlayerCard({ player, onClick }) {
 
   useEffect(() => {
     const fetchPrediction = async () => {
-      if (!user) return;
+      if (!user) {
+        console.log('No user found, skipping prediction fetch');
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        const { data } = await supabase
-          .from('predictions')
-          .select('prediction')
-          .eq('player_id', player.id)
-          .eq('user_id', user.id)
-          .single();
-        setPrediction(data?.prediction);
+        const response = await fetch('/api/predictions', {
+          headers: {
+            'Authorization': `Bearer ${user.access_token}`
+          }
+        });
+
+        if (response.status === 401) {
+          console.log('User is not authenticated');
+          setIsLoading(false);
+          return;
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to fetch prediction');
+        }
+
+        const data = await response.json();
+        const playerPrediction = data.find(p => p.player_id === player.id);
+        setPrediction(playerPrediction);
       } catch (error) {
         console.error('Error fetching prediction:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchPrediction();
   }, [player.id, user]);
+
+  const handlePick = async () => {
+    if (!user) {
+      console.log('No user found, redirecting to login');
+      router.push('/login');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/predictions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.access_token}`
+        },
+        body: JSON.stringify({
+          player_id: player.id,
+          prediction_type: 'in',
+          net_rating: player.net_rating
+        })
+      });
+
+      if (response.status === 401) {
+        console.log('User is not authenticated, redirecting to login');
+        router.push('/login');
+        return;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save prediction');
+      }
+
+      const data = await response.json();
+      setPrediction(data);
+    } catch (error) {
+      console.error('Error saving prediction:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (!player) return <LoadingSkeleton />;
 

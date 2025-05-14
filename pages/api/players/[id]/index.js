@@ -1,4 +1,4 @@
-import { getApiClient } from '../../../../lib/bdlClient';
+import { getApiClient, getAdvancedStats } from '../../../../lib/bdlClient';
 
 // Function to get current NBA season
 function getCurrentNBASeason() {
@@ -44,8 +44,17 @@ export default async function handler(req, res) {
   const { id } = req.query;
   const apiKey = process.env.BALLDONTLIE_API_KEY;
   
+  console.log('API handler called:', {
+    method: req.method,
+    playerId: id,
+    hasApiKey: !!apiKey,
+    url: req.url,
+    query: req.query
+  });
+
   if (!apiKey) {
-    return res.status(500).json({ error: 'API key not configured' });
+    console.error('API key is missing');
+    return res.status(500).json({ error: 'API key is missing' });
   }
 
   try {
@@ -81,89 +90,87 @@ export default async function handler(req, res) {
 
     // Fetch advanced stats for net rating
     let netRating = null;
+    let regularNetRating = null;
+    let playoffNetRating = null;
     try {
-      console.log('Fetching advanced stats for player:', {
+      console.log('Starting advanced stats fetch:', {
         playerId: id,
         season: currentSeason,
-        apiKey: apiKey ? 'present' : 'missing'
+        hasApiKey: !!apiKey
       });
 
-      const advancedStatsUrl = `https://api.balldontlie.io/v1/stats/advanced?player_ids[]=${id}&seasons[]=${currentSeason}&per_page=100`;
-      console.log('Advanced stats URL:', advancedStatsUrl);
-
-      const advancedStatsResponse = await fetch(advancedStatsUrl, {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
+      const advancedStats = await getAdvancedStats(parseInt(id), currentSeason);
+      console.log('Advanced stats response:', {
+        hasData: !!advancedStats?.data,
+        dataLength: advancedStats?.data?.length,
+        firstPlayer: advancedStats?.data?.[0]?.player_id,
+        netRating: advancedStats?.data?.[0]?.net_rating
       });
 
-      console.log('Advanced stats response status:', {
-        status: advancedStatsResponse.status,
-        statusText: advancedStatsResponse.statusText,
-        ok: advancedStatsResponse.ok
-      });
+      if (!advancedStats?.data) {
+        console.error('Invalid advanced stats response:', advancedStats);
+        throw new Error('Invalid advanced stats response');
+      }
 
-      if (!advancedStatsResponse.ok) {
-        const errorText = await advancedStatsResponse.text();
-        console.error('Advanced stats API error:', {
-          status: advancedStatsResponse.status,
-          statusText: advancedStatsResponse.statusText,
-          errorText,
+      if (advancedStats.data.length === 0) {
+        console.log('No advanced stats found for player:', {
           playerId: id,
           season: currentSeason
         });
       } else {
-        const advancedStats = await advancedStatsResponse.json();
-        console.log('Advanced stats response:', {
-          hasData: !!advancedStats?.data,
-          dataLength: advancedStats?.data?.length,
-          firstPlayer: advancedStats?.data?.[0]?.player_id,
-          netRating: advancedStats?.data?.[0]?.net_rating,
-          rawResponse: advancedStats
+        // Separate regular season and playoff games
+        const regularSeasonStats = advancedStats.data.filter(stat => !stat.game?.postseason);
+        const playoffStats = advancedStats.data.filter(stat => stat.game?.postseason);
+
+        console.log('Advanced stats breakdown:', {
+          totalGames: advancedStats.data.length,
+          regularSeasonGames: regularSeasonStats.length,
+          playoffGames: playoffStats.length,
+          sampleRegularGame: regularSeasonStats[0],
+          samplePlayoffGame: playoffStats[0]
         });
 
-        if (advancedStats.data && advancedStats.data.length > 0) {
-          // Calculate average net rating for the season
-          const validNetRatings = advancedStats.data
-            .filter(stat => stat.net_rating !== null && stat.net_rating !== undefined)
-            .map(stat => stat.net_rating);
+        // Calculate net ratings
+        const regularNetRatings = regularSeasonStats
+          .filter(stat => stat.net_rating !== null && stat.net_rating !== undefined)
+          .map(stat => stat.net_rating);
 
-          if (validNetRatings.length > 0) {
-            netRating = validNetRatings.reduce((sum, rating) => sum + rating, 0) / validNetRatings.length;
-            console.log('Calculated average net rating:', {
-              playerId: id,
-              netRating,
-              season: currentSeason,
-              totalGames: validNetRatings.length,
-              allRatings: validNetRatings,
-              stats: advancedStats.data.map(s => ({
-                date: s.game?.date,
-                netRating: s.net_rating
-              }))
-            });
-          } else {
-            console.log('No valid net ratings found for player:', {
-              playerId: id,
-              season: currentSeason,
-              totalGames: advancedStats.data.length
-            });
-          }
-        } else {
-          console.log('No advanced stats found for player:', {
-            playerId: id,
-            season: currentSeason,
-            response: advancedStats
-          });
-        }
+        const playoffNetRatings = playoffStats
+          .filter(stat => stat.net_rating !== null && stat.net_rating !== undefined)
+          .map(stat => stat.net_rating);
+
+        console.log('Net rating arrays:', {
+          regularNetRatings,
+          playoffNetRatings,
+          regularCount: regularNetRatings.length,
+          playoffCount: playoffNetRatings.length
+        });
+
+        // Calculate averages
+        regularNetRating = regularNetRatings.length > 0 
+          ? regularNetRatings.reduce((sum, rating) => sum + rating, 0) / regularNetRatings.length 
+          : null;
+
+        playoffNetRating = playoffNetRatings.length > 0
+          ? playoffNetRatings.reduce((sum, rating) => sum + rating, 0) / playoffNetRatings.length
+          : null;
+
+        console.log('Calculated net ratings:', {
+          regularNetRating,
+          playoffNetRating,
+          regularCount: regularNetRatings.length,
+          playoffCount: playoffNetRatings.length
+        });
+
+        // Use regular season net rating by default
+        netRating = regularNetRating;
       }
     } catch (error) {
       console.error('Error fetching advanced stats:', {
         error: error.message,
         playerId: id,
         season: currentSeason,
-        stack: error.stack,
-        type: error.name
+        stack: error.stack
       });
       // Continue without advanced stats
     }
@@ -308,9 +315,12 @@ export default async function handler(req, res) {
       } : null
     });
 
-    return res.status(200).json({
+    // Prepare the response
+    const responseData = {
       player: {
         ...player,
+        regular_net_rating: regularNetRating,
+        playoff_net_rating: playoffNetRating,
         net_rating: netRating,
         season_averages: seasonAverages,
         regular_averages: regularAverages,
@@ -318,7 +328,17 @@ export default async function handler(req, res) {
         recent_games: lastFiveGames,
         is_in_playoffs: playoffGames.length > 0
       }
+    };
+
+    console.log('Final response data:', {
+      playerId: id,
+      regularNetRating: responseData.player.regular_net_rating,
+      playoffNetRating: responseData.player.playoff_net_rating,
+      hasRegularNetRating: responseData.player.regular_net_rating !== null,
+      hasPlayoffNetRating: responseData.player.playoff_net_rating !== null
     });
+
+    return res.status(200).json(responseData);
 
   } catch (error) {
     console.error('Error in player API:', {

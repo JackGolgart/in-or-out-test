@@ -2,12 +2,9 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from '../lib/supabaseClient';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const supabase = getSupabaseClient();
 
 export default function Portfolio() {
   const { user } = useAuth();

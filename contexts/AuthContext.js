@@ -1,36 +1,28 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { getSupabaseClient } from '../lib/supabaseClient';
 
 // Create the auth context with a default value
-const AuthContext = createContext({
-  user: null,
-  loading: true,
-  signIn: () => {},
-  signUp: () => {},
-  signOut: () => {},
-});
+const AuthContext = createContext({});
 
 // Create the auth provider component
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState(null);
+  const supabase = getSupabaseClient();
 
   useEffect(() => {
     // Check active sessions and sets the user
     const initializeAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setUser(session?.user ?? null);
+        console.log('Initializing auth...');
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        console.log('Current session:', currentSession?.user?.id);
+        
+        if (currentSession) {
+          setSession(currentSession);
+          setUser(currentSession.user);
+        }
       } catch (error) {
         console.error('Error initializing auth:', error);
       } finally {
@@ -41,34 +33,56 @@ export function AuthProvider({ children }) {
     initializeAuth();
 
     // Listen for changes on auth state (logged in, signed out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      console.log('Auth state changed:', event, currentSession?.user?.id);
+      
+      if (currentSession) {
+        setSession(currentSession);
+        setUser(currentSession.user);
+      } else {
+        setSession(null);
+        setUser(null);
+      }
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
   const value = {
+    signUp: async (data) => {
+      const { data: result, error } = await supabase.auth.signUp(data);
+      if (error) throw error;
+      return result;
+    },
+    signIn: async (data) => {
+      const { data: result, error } = await supabase.auth.signInWithPassword(data);
+      if (error) throw error;
+      return result;
+    },
+    signOut: async () => {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    },
     user,
+    session,
     loading,
-    signIn: (data) => supabase.auth.signInWithPassword(data),
-    signUp: (data) => supabase.auth.signUp(data),
-    signOut: () => supabase.auth.signOut(),
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 }
 
 // Create a custom hook to use the auth context
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-} 
+}; 
