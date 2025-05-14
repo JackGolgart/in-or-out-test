@@ -119,33 +119,41 @@ export default async function handler(req, res) {
     const today = new Date();
     today.setHours(23, 59, 59, 999); // Set to end of day to include today's games
 
-    // Filter games up to today's date
-    const recentGames = allGames.filter(g => {
-      const gameDate = new Date(g.game.date);
-      return gameDate <= today;
-    }).sort((a, b) => new Date(b.game.date) - new Date(a.game.date)); // Ensure proper sorting
-
-    // Check if most recent games are playoff games
-    const isInPlayoffs = recentGames.length > 0 && recentGames[0].game.postseason;
+    // Filter games up to today's date and sort by most recent
+    const recentGames = allGames
+      .filter(g => {
+        const gameDate = new Date(g.game.date);
+        return gameDate <= today;
+      })
+      .sort((a, b) => new Date(b.game.date) - new Date(a.game.date));
 
     // Filter regular season and playoff games
-    const regularGames = recentGames.filter(g => !g.game.postseason);
-    const playoffGames = recentGames.filter(g => g.game.postseason);
+    const regularGames = recentGames.filter(g => g.game.postseason === false);
+    const playoffGames = recentGames.filter(g => g.game.postseason === true);
 
-    console.log('Filtered games:', {
+    console.log('Game filtering:', {
       totalGames: allGames.length,
       recentGames: recentGames.length,
       regularGames: regularGames.length,
       playoffGames: playoffGames.length,
-      isInPlayoffs
+      firstRegularGame: regularGames[0] ? {
+        date: regularGames[0].game.date,
+        postseason: regularGames[0].game.postseason,
+        status: regularGames[0].game.status
+      } : null,
+      firstPlayoffGame: playoffGames[0] ? {
+        date: playoffGames[0].game.date,
+        postseason: playoffGames[0].game.postseason,
+        status: playoffGames[0].game.status
+      } : null
     });
 
     // Calculate averages
     const regularAverages = calculateAverages(regularGames);
     const playoffAverages = calculateAverages(playoffGames);
 
-    // Use playoff averages if player is in playoffs
-    let seasonAverages = isInPlayoffs ? playoffAverages : regularAverages;
+    // Use regular season averages by default
+    let seasonAverages = regularAverages;
 
     // Get most recent game for team info
     let currentTeam = player.team;
@@ -161,33 +169,43 @@ export default async function handler(req, res) {
       }
     }
 
-    // If we don't have a team from recent games, try to get it from the player's most recent game
-    if (!currentTeam && allGames.length > 0) {
-      const mostRecent = allGames[0];
-      if (mostRecent.team) {
-        console.log('Using team from most recent game:', {
-          team: mostRecent.team.full_name,
-          gameDate: mostRecent.game.date
-        });
-        currentTeam = mostRecent.team;
-      }
-    }
-
     player.team = currentTeam;
 
     // Prepare recent games (last 5 games)
-    const lastFiveGames = recentGames.slice(0, 5).map(game => ({
-      date: game.game.date,
-      opponent: game.game.home_team_id === game.team.id ? game.game.visitor_team_id : game.game.home_team_id,
-      points: game.pts,
-      rebounds: game.reb,
-      assists: game.ast,
-      minutes: game.min,
-      result: game.game.home_team_score > game.game.visitor_team_score ? 'W' : 'L',
-      score: `${game.game.home_team_score}-${game.game.visitor_team_score}`,
-      isPlayoff: game.game.postseason,
-      gameType: game.game.postseason ? 'Playoff' : 'Regular Season'
-    }));
+    const lastFiveGames = [...regularGames, ...playoffGames]
+      .sort((a, b) => new Date(b.game.date) - new Date(a.game.date))
+      .slice(0, 5)
+      .map(game => {
+        const isPlayoff = game.game.postseason === true;
+        console.log('Processing game:', {
+          date: game.game.date,
+          postseason: game.game.postseason,
+          isPlayoff,
+          team: game.team?.full_name,
+          rawGame: game // Log the entire game object
+        });
+        
+        const processedGame = {
+          date: game.game.date,
+          opponent: game.game.home_team_id === game.team.id ? game.game.visitor_team_id : game.game.home_team_id,
+          points: game.pts || 0,
+          rebounds: game.reb || 0,
+          assists: game.ast || 0,
+          minutes: game.min || '0',
+          result: game.game.home_team_score > game.game.visitor_team_score ? 'W' : 'L',
+          score: `${game.game.home_team_score}-${game.game.visitor_team_score}`,
+          isPlayoff,
+          gameType: isPlayoff ? 'Playoff' : 'Regular Season'
+        };
+
+        console.log('Processed game:', {
+          date: processedGame.date,
+          isPlayoff: processedGame.isPlayoff,
+          type: processedGame.gameType
+        });
+
+        return processedGame;
+      });
 
     console.log('Final player data:', {
       id: player.id,
@@ -195,9 +213,19 @@ export default async function handler(req, res) {
       team: player.team?.full_name,
       games: seasonAverages.games_played,
       recentGames: lastFiveGames.length,
-      isInPlayoffs,
       hasRegularGames: regularGames.length > 0,
-      hasPlayoffGames: playoffGames.length > 0
+      hasPlayoffGames: playoffGames.length > 0,
+      firstGame: lastFiveGames[0] ? {
+        date: lastFiveGames[0].date,
+        isPlayoff: lastFiveGames[0].isPlayoff,
+        type: lastFiveGames[0].gameType,
+        rawGame: lastFiveGames[0]
+      } : null,
+      allGames: lastFiveGames.map(g => ({
+        date: g.date,
+        isPlayoff: g.isPlayoff,
+        type: g.gameType
+      }))
     });
 
     return res.status(200).json({
@@ -207,7 +235,7 @@ export default async function handler(req, res) {
         regular_averages: regularAverages,
         playoff_averages: playoffAverages,
         recent_games: lastFiveGames,
-        is_in_playoffs: isInPlayoffs
+        is_in_playoffs: playoffGames.length > 0
       }
     });
 

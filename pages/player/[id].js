@@ -10,6 +10,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import Link from 'next/link';
 import styles from '../../styles/Player.module.css';
 import getTeamLogo from '../../lib/teamLogos';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Function to get current NBA season
 function getCurrentNBASeason() {
@@ -24,24 +25,145 @@ function getCurrentNBASeason() {
 
 export default function PlayerPage({ player, stats, gameStats, playerHistory, error }) {
   const router = useRouter();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(error);
-  const [showPlayoffs, setShowPlayoffs] = useState(player?.is_in_playoffs || false);
+  const [showPlayoffs, setShowPlayoffs] = useState(false);
   const [playerData, setPlayerData] = useState(player);
   const [seasonStats, setSeasonStats] = useState(stats);
   const [recentGames, setRecentGames] = useState(gameStats);
   const [history, setHistory] = useState(playerHistory);
+  const [prediction, setPrediction] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Filter recent games based on showPlayoffs state
+  const filteredRecentGames = recentGames.filter(game => {
+    const matches = game.isPlayoff === showPlayoffs;
+    console.log('Filtering game:', {
+      date: game.date,
+      isPlayoff: game.isPlayoff,
+      showPlayoffs,
+      matches,
+      gameType: game.gameType,
+      rawGame: game // Log the entire game object
+    });
+    return matches;
+  }).slice(0, 5);
+
+  // Fetch prediction only when user or player ID changes
+  useEffect(() => {
+    if (user && player?.id) {
+      fetchPrediction();
+    }
+  }, [user, player?.id]);
+
+  const fetchPrediction = async () => {
+    try {
+      const response = await fetch('/api/predictions');
+      if (!response.ok) throw new Error('Failed to fetch prediction');
+      const data = await response.json();
+      const playerPrediction = data.find(p => p.player_id === player.id);
+      setPrediction(playerPrediction);
+    } catch (error) {
+      console.error('Error fetching prediction:', error);
+    }
+  };
+
+  const handlePrediction = async (type) => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('/api/predictions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.access_token}`
+        },
+        body: JSON.stringify({
+          player_id: player.id,
+          prediction_type: type,
+          net_rating: player.net_rating
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to save prediction');
+
+      const data = await response.json();
+      setPrediction(data);
+    } catch (error) {
+      console.error('Error saving prediction:', error);
+      setErrorMessage('Failed to save prediction');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Choose which averages to show
+  const averages = showPlayoffs ? playerData?.playoff_averages : playerData?.regular_averages;
 
   // Update state when props change
   useEffect(() => {
     if (player) {
+      console.log('Updating player data:', {
+        isInPlayoffs: player.is_in_playoffs,
+        regularGames: player.regular_averages?.games_played,
+        playoffGames: player.playoff_averages?.games_played,
+        recentGames: player.recent_games?.length,
+        firstGame: player.recent_games?.[0] ? {
+          date: player.recent_games[0].date,
+          isPlayoff: player.recent_games[0].isPlayoff,
+          type: player.recent_games[0].gameType,
+          rawGame: player.recent_games[0] // Log the entire first game
+        } : null,
+        allGames: player.recent_games?.map(g => ({
+          date: g.date,
+          isPlayoff: g.isPlayoff,
+          type: g.gameType
+        }))
+      });
       setPlayerData(player);
       setSeasonStats(stats);
       setRecentGames(gameStats);
       setHistory(playerHistory);
-      setShowPlayoffs(player.is_in_playoffs || false);
     }
   }, [player, stats, gameStats, playerHistory]);
+
+  // Handle toggle change
+  const handleToggleChange = () => {
+    const newValue = !showPlayoffs;
+    console.log('Toggling playoffs:', {
+      from: showPlayoffs,
+      to: newValue,
+      availableGames: {
+        regular: recentGames.filter(g => !g.isPlayoff).length,
+        playoff: recentGames.filter(g => g.isPlayoff).length
+      },
+      allGames: recentGames.map(g => ({
+        date: g.date,
+        isPlayoff: g.isPlayoff,
+        type: g.gameType
+      }))
+    });
+    setShowPlayoffs(newValue);
+  };
+
+  // Debug log for recent games
+  useEffect(() => {
+    console.log('Recent games state:', {
+      total: recentGames.length,
+      regular: recentGames.filter(g => !g.isPlayoff).length,
+      playoff: recentGames.filter(g => g.isPlayoff).length,
+      games: recentGames.map(g => ({
+        date: g.date,
+        isPlayoff: g.isPlayoff,
+        type: g.gameType
+      }))
+    });
+  }, [recentGames]);
 
   if (isLoading) {
     return (
@@ -102,10 +224,6 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
     });
   };
 
-  // Choose which averages to show
-  const averages = showPlayoffs ? playerData.playoff_averages : playerData.regular_averages;
-  const toggleLabel = showPlayoffs ? 'Playoff Averages' : 'Regular Season Averages';
-
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
@@ -141,53 +259,84 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
 
         {/* Stats Section */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          {/* Switch for regular/playoff averages */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-white">Season Averages</h2>
-            <div className="flex items-center space-x-2">
-              <span className="text-white">Regular Season</span>
+          {/* Prediction Buttons */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-white mb-4">Make Your Prediction</h2>
+            <div className="flex space-x-4">
               <button
-                onClick={() => setShowPlayoffs(!showPlayoffs)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
-                  showPlayoffs ? 'bg-purple-600' : 'bg-gray-600'
+                onClick={() => handlePrediction('in')}
+                disabled={isSubmitting || prediction?.prediction_type === 'in'}
+                className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-colors ${
+                  prediction?.prediction_type === 'in'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-green-500 hover:bg-green-600 text-white'
                 }`}
               >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    showPlayoffs ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
+                {isSubmitting ? 'Saving...' : 'IN'}
               </button>
-              <span className="text-white">Playoffs</span>
+              <button
+                onClick={() => handlePrediction('out')}
+                disabled={isSubmitting || prediction?.prediction_type === 'out'}
+                className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-colors ${
+                  prediction?.prediction_type === 'out'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-red-500 hover:bg-red-600 text-white'
+                }`}
+              >
+                {isSubmitting ? 'Saving...' : 'OUT'}
+              </button>
             </div>
+            {prediction && (
+              <p className="mt-2 text-gray-400">
+                You predicted {prediction.prediction_type.toUpperCase()} at net rating {prediction.net_rating_at_prediction.toFixed(1)}
+              </p>
+            )}
           </div>
 
           {/* Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
             <div className="card-base p-6 text-center">
-              <span className="text-3xl font-bold text-white block mb-2">{averages.points.toFixed(1)}</span>
+              <span className="text-3xl font-bold text-white block mb-2">{averages?.points?.toFixed(1) || '0.0'}</span>
               <span className="text-gray-400">Points</span>
             </div>
             <div className="card-base p-6 text-center">
-              <span className="text-3xl font-bold text-white block mb-2">{averages.rebounds.toFixed(1)}</span>
+              <span className="text-3xl font-bold text-white block mb-2">{averages?.rebounds?.toFixed(1) || '0.0'}</span>
               <span className="text-gray-400">Rebounds</span>
             </div>
             <div className="card-base p-6 text-center">
-              <span className="text-3xl font-bold text-white block mb-2">{averages.assists.toFixed(1)}</span>
+              <span className="text-3xl font-bold text-white block mb-2">{averages?.assists?.toFixed(1) || '0.0'}</span>
               <span className="text-gray-400">Assists</span>
             </div>
             <div className="card-base p-6 text-center">
-              <span className="text-3xl font-bold text-white block mb-2">{averages.games_played}</span>
+              <span className="text-3xl font-bold text-white block mb-2">{averages?.games_played || 0}</span>
               <span className="text-gray-400">Games</span>
             </div>
           </div>
 
           {/* Recent Games */}
           <div className="card-base p-6">
-            <h3 className="text-xl font-semibold text-white mb-6">Recent Games</h3>
-            {recentGames.length > 0 ? (
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-white">Recent Games</h3>
+              <div className="flex items-center space-x-2">
+                <span className="text-white">Regular Season</span>
+                <button
+                  onClick={handleToggleChange}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                    showPlayoffs ? 'bg-purple-600' : 'bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      showPlayoffs ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className="text-white">Playoffs</span>
+              </div>
+            </div>
+            {filteredRecentGames.length > 0 ? (
               <div className="space-y-4">
-                {recentGames.map((game, index) => (
+                {filteredRecentGames.map((game, index) => (
                   <div key={index} className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
@@ -221,7 +370,9 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
                 ))}
               </div>
             ) : (
-              <p className="text-gray-400 text-center py-8">No recent games available</p>
+              <p className="text-gray-400 text-center py-8">
+                No {showPlayoffs ? 'playoff' : 'regular season'} games available
+              </p>
             )}
           </div>
         </div>
@@ -240,8 +391,12 @@ export async function getServerSideProps({ params, req }) {
     const host = req.headers.host;
     const baseUrl = `${protocol}://${host}`;
     
-    // Fetch player data from our API endpoint
-    const playerRes = await fetch(`${baseUrl}/api/players/${id}`);
+    // Fetch player data and history in parallel
+    const [playerRes, historyRes] = await Promise.all([
+      fetch(`${baseUrl}/api/players/${id}`),
+      fetch(`${baseUrl}/api/players/${id}/history`)
+    ]);
+
     if (!playerRes.ok) {
       const errorData = await playerRes.json();
       console.error('Player API error:', {
@@ -262,6 +417,8 @@ export async function getServerSideProps({ params, req }) {
     }
 
     const playerData = await playerRes.json();
+    const history = historyRes.ok ? await historyRes.json() : [];
+
     console.log('Player API response:', {
       hasPlayer: !!playerData?.player,
       hasStats: !!playerData?.player?.season_averages,
@@ -280,19 +437,6 @@ export async function getServerSideProps({ params, req }) {
           playerHistory: []
         }
       };
-    }
-
-    // Fetch player history
-    let history = [];
-    try {
-      const historyRes = await fetch(`${baseUrl}/api/players/${id}/history`);
-      if (historyRes.ok) {
-        history = await historyRes.json();
-      } else {
-        console.error('Failed to fetch player history:', await historyRes.json());
-      }
-    } catch (historyError) {
-      console.error('Error fetching player history:', historyError);
     }
 
     // Get recent games from the player data
