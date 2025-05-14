@@ -41,30 +41,23 @@ export default async function handler(req, res) {
   // Set JSON content type for all responses
   res.setHeader('Content-Type', 'application/json');
 
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  const { id, season } = req.query;
-  if (!id) {
-    return res.status(400).json({ error: 'Player ID is required' });
+  const { id } = req.query;
+  const apiKey = process.env.BALLDONTLIE_API_KEY;
+  
+  if (!apiKey) {
+    return res.status(500).json({ error: 'API key not configured' });
   }
 
   try {
-    const apiInstance = getApiClient();
+    // Get current season
     const currentSeason = getCurrentNBASeason();
-    const { startDate, endDate } = getSeasonDates(currentSeason);
+    console.log('Fetching player data for ID:', id, 'Season:', currentSeason);
 
-    // Format dates for API
-    const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
+    // Initialize API client
+    const apiInstance = getApiClient();
 
-    // First, get the player's basic information
-    console.log('Fetching player data for ID:', id);
-    const playersResponse = await apiInstance.nba.getPlayers({
-      player_ids: [parseInt(id)],
-      per_page: 1
-    }).catch(error => {
+    // Fetch player data
+    const playerResponse = await apiInstance.nba.getPlayer(id).catch(error => {
       console.error('Error fetching player data:', {
         error: error.message,
         playerId: id,
@@ -74,19 +67,106 @@ export default async function handler(req, res) {
       throw error;
     });
 
-    if (!playersResponse?.data?.length) {
-      console.log('No player data found for ID:', id);
+    if (!playerResponse?.data) {
+      console.error('No player data found:', { playerId: id });
       return res.status(404).json({ error: 'Player not found' });
     }
 
-    const player = playersResponse.data[0];
-    console.log('Found player:', {
+    const player = playerResponse.data;
+    console.log('Player data:', {
       id: player.id,
       name: `${player.first_name} ${player.last_name}`,
-      initialTeam: player.team?.full_name,
-      position: player.position,
-      jerseyNumber: player.jersey_number
+      team: player.team?.full_name
     });
+
+    // Fetch advanced stats for net rating
+    let netRating = null;
+    try {
+      console.log('Fetching advanced stats for player:', {
+        playerId: id,
+        season: currentSeason,
+        apiKey: apiKey ? 'present' : 'missing'
+      });
+
+      const advancedStatsUrl = `https://api.balldontlie.io/v1/stats/advanced?player_ids[]=${id}&seasons[]=${currentSeason}&per_page=100`;
+      console.log('Advanced stats URL:', advancedStatsUrl);
+
+      const advancedStatsResponse = await fetch(advancedStatsUrl, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+      });
+
+      console.log('Advanced stats response status:', {
+        status: advancedStatsResponse.status,
+        statusText: advancedStatsResponse.statusText,
+        ok: advancedStatsResponse.ok
+      });
+
+      if (!advancedStatsResponse.ok) {
+        const errorText = await advancedStatsResponse.text();
+        console.error('Advanced stats API error:', {
+          status: advancedStatsResponse.status,
+          statusText: advancedStatsResponse.statusText,
+          errorText,
+          playerId: id,
+          season: currentSeason
+        });
+      } else {
+        const advancedStats = await advancedStatsResponse.json();
+        console.log('Advanced stats response:', {
+          hasData: !!advancedStats?.data,
+          dataLength: advancedStats?.data?.length,
+          firstPlayer: advancedStats?.data?.[0]?.player_id,
+          netRating: advancedStats?.data?.[0]?.net_rating,
+          rawResponse: advancedStats
+        });
+
+        if (advancedStats.data && advancedStats.data.length > 0) {
+          // Calculate average net rating for the season
+          const validNetRatings = advancedStats.data
+            .filter(stat => stat.net_rating !== null && stat.net_rating !== undefined)
+            .map(stat => stat.net_rating);
+
+          if (validNetRatings.length > 0) {
+            netRating = validNetRatings.reduce((sum, rating) => sum + rating, 0) / validNetRatings.length;
+            console.log('Calculated average net rating:', {
+              playerId: id,
+              netRating,
+              season: currentSeason,
+              totalGames: validNetRatings.length,
+              allRatings: validNetRatings,
+              stats: advancedStats.data.map(s => ({
+                date: s.game?.date,
+                netRating: s.net_rating
+              }))
+            });
+          } else {
+            console.log('No valid net ratings found for player:', {
+              playerId: id,
+              season: currentSeason,
+              totalGames: advancedStats.data.length
+            });
+          }
+        } else {
+          console.log('No advanced stats found for player:', {
+            playerId: id,
+            season: currentSeason,
+            response: advancedStats
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching advanced stats:', {
+        error: error.message,
+        playerId: id,
+        season: currentSeason,
+        stack: error.stack,
+        type: error.name
+      });
+      // Continue without advanced stats
+    }
 
     // Fetch regular season stats
     console.log('Fetching stats for player:', {
@@ -231,6 +311,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       player: {
         ...player,
+        net_rating: netRating,
         season_averages: seasonAverages,
         regular_averages: regularAverages,
         playoff_averages: playoffAverages,
@@ -240,18 +321,12 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('Error in player detail API:', {
+    console.error('Error in player API:', {
       message: error.message,
       stack: error.stack,
-      playerId: id,
-      season: currentSeason
-    });
-    
-    // Return more specific error information
-    return res.status(500).json({ 
-      error: 'Failed to fetch player data',
-      details: error.message,
       playerId: id
     });
+    
+    return res.status(500).json({ error: 'Failed to load player data' });
   }
 } 

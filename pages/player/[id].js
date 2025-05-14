@@ -25,7 +25,7 @@ function getCurrentNBASeason() {
 
 export default function PlayerPage({ player, stats, gameStats, playerHistory, error }) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(error);
   const [showPlayoffs, setShowPlayoffs] = useState(false);
@@ -86,30 +86,72 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
   }, [user, player?.id]);
 
   const fetchPrediction = async () => {
+    if (!user || !session) {
+      console.log('No user or session found, skipping prediction fetch');
+      return;
+    }
+
     try {
-      const response = await fetch('/api/predictions');
-      if (!response.ok) throw new Error('Failed to fetch prediction');
+      console.log('Fetching prediction with session:', session?.user?.id);
+      const response = await fetch('/api/predictions', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (response.status === 401) {
+        console.log('User is not authenticated, redirecting to login');
+        router.push('/login');
+        return;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch prediction');
+      }
+
       const data = await response.json();
       const playerPrediction = data.find(p => p.player_id === player.id);
       setPrediction(playerPrediction);
     } catch (error) {
       console.error('Error fetching prediction:', error);
+      setErrorMessage(error.message);
     }
   };
 
   const handlePrediction = async (type) => {
-    if (!user) {
+    if (!user || !session) {
+      console.log('No user or session found, redirecting to login');
       router.push('/login');
+      return;
+    }
+
+    if (!player?.id) {
+      console.error('Missing player ID');
+      setErrorMessage('Missing player data');
+      return;
+    }
+
+    if (player?.net_rating === undefined || player?.net_rating === null) {
+      console.error('Missing net rating data');
+      setErrorMessage('Net rating data is not available for this player');
       return;
     }
 
     setIsSubmitting(true);
     try {
+      console.log('Saving prediction with session:', session?.user?.id);
+      console.log('Prediction data:', {
+        player_id: player.id,
+        prediction_type: type,
+        net_rating: player.net_rating
+      });
+
       const response = await fetch('/api/predictions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.access_token}`
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           player_id: player.id,
@@ -118,13 +160,24 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
         })
       });
 
-      if (!response.ok) throw new Error('Failed to save prediction');
+      if (response.status === 401) {
+        console.log('User is not authenticated, redirecting to login');
+        router.push('/login');
+        return;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Prediction API error:', errorData);
+        throw new Error(errorData.error || 'Failed to save prediction');
+      }
 
       const data = await response.json();
+      console.log('Prediction saved successfully:', data);
       setPrediction(data);
     } catch (error) {
       console.error('Error saving prediction:', error);
-      setErrorMessage('Failed to save prediction');
+      setErrorMessage(error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -162,6 +215,17 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
       }))
     });
   }, [recentGames]);
+
+  useEffect(() => {
+    if (player) {
+      console.log('Player data loaded:', {
+        id: player.id,
+        name: `${player.first_name} ${player.last_name}`,
+        netRating: player.net_rating,
+        hasNetRating: player.net_rating !== undefined && player.net_rating !== null
+      });
+    }
+  }, [player]);
 
   if (isLoading) {
     return (
@@ -260,34 +324,45 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
           {/* Prediction Buttons */}
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-white mb-4">Make Your Prediction</h2>
-            <div className="flex space-x-4">
-              <button
-                onClick={() => handlePrediction('in')}
-                disabled={isSubmitting || prediction?.prediction_type === 'in'}
-                className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-colors ${
-                  prediction?.prediction_type === 'in'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-green-500 hover:bg-green-600 text-white'
-                }`}
-              >
-                {isSubmitting ? 'Saving...' : 'IN'}
-              </button>
-              <button
-                onClick={() => handlePrediction('out')}
-                disabled={isSubmitting || prediction?.prediction_type === 'out'}
-                className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-colors ${
-                  prediction?.prediction_type === 'out'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-red-500 hover:bg-red-600 text-white'
-                }`}
-              >
-                {isSubmitting ? 'Saving...' : 'OUT'}
-              </button>
-            </div>
-            {prediction && (
-              <p className="mt-2 text-gray-400">
-                You predicted {prediction.prediction_type.toUpperCase()} at net rating {prediction.net_rating_at_prediction.toFixed(1)}
-              </p>
+            {player?.net_rating === undefined || player?.net_rating === null ? (
+              <div className="text-center py-4">
+                <p className="text-gray-400">Net rating data is not available for this player</p>
+                <p className="text-sm text-gray-500 mt-2">
+                  This could be because the player hasn't played enough games this season or the data hasn't been updated yet.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="flex space-x-4">
+                  <button
+                    onClick={() => handlePrediction('in')}
+                    disabled={isSubmitting || prediction?.prediction_type === 'in'}
+                    className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-colors ${
+                      prediction?.prediction_type === 'in'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-green-500 hover:bg-green-600 text-white'
+                    }`}
+                  >
+                    {isSubmitting ? 'Saving...' : 'IN'}
+                  </button>
+                  <button
+                    onClick={() => handlePrediction('out')}
+                    disabled={isSubmitting || prediction?.prediction_type === 'out'}
+                    className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-colors ${
+                      prediction?.prediction_type === 'out'
+                        ? 'bg-red-600 text-white'
+                        : 'bg-red-500 hover:bg-red-600 text-white'
+                    }`}
+                  >
+                    {isSubmitting ? 'Saving...' : 'OUT'}
+                  </button>
+                </div>
+                {prediction && (
+                  <p className="mt-2 text-gray-400">
+                    You predicted {prediction.prediction_type.toUpperCase()} at net rating {prediction.net_rating_at_prediction.toFixed(1)}
+                  </p>
+                )}
+              </>
             )}
           </div>
 
@@ -306,8 +381,8 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
               <span className="text-gray-400">Assists</span>
             </div>
             <div className="card-base p-6 text-center">
-              <span className="text-3xl font-bold text-white block mb-2">{averages?.games_played || 0}</span>
-              <span className="text-gray-400">Games</span>
+              <span className="text-3xl font-bold text-white block mb-2">{playerData?.net_rating?.toFixed(1) || '0.0'}</span>
+              <span className="text-gray-400">Net Rating</span>
             </div>
           </div>
 
