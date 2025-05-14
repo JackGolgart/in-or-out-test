@@ -13,6 +13,10 @@ export default async function handler(req, res) {
   const { id } = req.query;
   const apiKey = process.env.BALLDONTLIE_API_KEY;
   
+  if (!apiKey) {
+    return res.status(500).json({ error: 'API key not configured' });
+  }
+
   // Calculate seasons dynamically (last 6 seasons)
   const currentSeason = getCurrentNBASeason();
   const seasons = Array.from({ length: 6 }, (_, i) => currentSeason - i).sort();
@@ -20,7 +24,7 @@ export default async function handler(req, res) {
 
   for (let season of seasons) {
     try {
-      const advancedStatsRes = await fetch(
+      const response = await fetch(
         `https://api.balldontlie.io/v2/stats/advanced?player_ids[]=${id}&seasons[]=${season}&per_page=100`,
         {
           headers: {
@@ -29,14 +33,22 @@ export default async function handler(req, res) {
         }
       );
       
-      if (!advancedStatsRes.ok) {
-        throw new Error(`API returned ${advancedStatsRes.status}`);
+      if (!response.ok) {
+        // If we get a 404, it means no data for this season, which is normal
+        if (response.status === 404) {
+          history.push({ 
+            season, 
+            net_rating: null 
+          });
+          continue;
+        }
+        throw new Error(`API returned ${response.status}`);
       }
 
-      const advancedStats = await advancedStatsRes.json();
+      const data = await response.json();
       
-      if (advancedStats.data && advancedStats.data.length > 0) {
-        const seasonStats = advancedStats.data[0];
+      if (data.data && data.data.length > 0) {
+        const seasonStats = data.data[0];
         history.push({ 
           season, 
           net_rating: seasonStats.net_rating 
@@ -49,12 +61,16 @@ export default async function handler(req, res) {
       }
     } catch (err) {
       console.error(`Failed for season ${season}:`, err);
+      // Don't throw error, just add null for this season
       history.push({ 
         season, 
         net_rating: null 
       });
     }
   }
+
+  // Sort history by season in descending order
+  history.sort((a, b) => b.season - a.season);
 
   res.status(200).json(history);
 } 

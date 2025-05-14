@@ -19,14 +19,21 @@ function getSeasonDates(season) {
 }
 
 function calculateAverages(games) {
-  if (!games.length) return {
+  // Filter out games where the player didn't play (minutes = 0 or '00')
+  const playedGames = games.filter(g => {
+    const minutes = g.min;
+    return minutes && minutes !== '00' && minutes !== '0';
+  });
+
+  if (!playedGames.length) return {
     points: 0, rebounds: 0, assists: 0, games_played: 0
   };
+
   return {
-    points: games.reduce((sum, g) => sum + (g.pts || 0), 0) / games.length,
-    rebounds: games.reduce((sum, g) => sum + (g.reb || 0), 0) / games.length,
-    assists: games.reduce((sum, g) => sum + (g.ast || 0), 0) / games.length,
-    games_played: games.length
+    points: playedGames.reduce((sum, g) => sum + (g.pts || 0), 0) / playedGames.length,
+    rebounds: playedGames.reduce((sum, g) => sum + (g.reb || 0), 0) / playedGames.length,
+    assists: playedGames.reduce((sum, g) => sum + (g.ast || 0), 0) / playedGames.length,
+    games_played: playedGames.length
   };
 }
 
@@ -117,19 +124,22 @@ export default async function handler(req, res) {
 
     // Get today's date for filtering
     const today = new Date();
-    today.setHours(23, 59, 59, 999); // Set to end of day to include today's games
+    today.setHours(0, 0, 0, 0); // Set to start of day
 
     // Filter games up to today's date and sort by most recent
     const recentGames = allGames
       .filter(g => {
         const gameDate = new Date(g.game.date);
-        return gameDate <= today;
+        return gameDate <= today && g.game.status === 'Final';
       })
       .sort((a, b) => new Date(b.game.date) - new Date(a.game.date));
 
     // Filter regular season and playoff games
-    const regularGames = recentGames.filter(g => g.game.postseason === false);
-    const playoffGames = recentGames.filter(g => g.game.postseason === true);
+    const regularGames = recentGames
+      .filter(g => g.game.postseason === false);
+
+    const playoffGames = recentGames
+      .filter(g => g.game.postseason === true);
 
     console.log('Game filtering:', {
       totalGames: allGames.length,
@@ -171,21 +181,21 @@ export default async function handler(req, res) {
 
     player.team = currentTeam;
 
-    // Prepare recent games (last 5 games)
-    const lastFiveGames = [...regularGames, ...playoffGames]
+    // Prepare recent games (last 5 of each type)
+    const lastFiveRegularGames = regularGames.slice(0, 5);
+    const lastFivePlayoffGames = playoffGames.slice(0, 5);
+    const lastFiveGames = [...lastFiveRegularGames, ...lastFivePlayoffGames]
       .sort((a, b) => new Date(b.game.date) - new Date(a.game.date))
-      .slice(0, 5)
       .map(game => {
         const isPlayoff = game.game.postseason === true;
         console.log('Processing game:', {
           date: game.game.date,
           postseason: game.game.postseason,
           isPlayoff,
-          team: game.team?.full_name,
-          rawGame: game // Log the entire game object
+          team: game.team?.full_name
         });
         
-        const processedGame = {
+        return {
           date: game.game.date,
           opponent: game.game.home_team_id === game.team.id ? game.game.visitor_team_id : game.game.home_team_id,
           points: game.pts || 0,
@@ -197,14 +207,6 @@ export default async function handler(req, res) {
           isPlayoff,
           gameType: isPlayoff ? 'Playoff' : 'Regular Season'
         };
-
-        console.log('Processed game:', {
-          date: processedGame.date,
-          isPlayoff: processedGame.isPlayoff,
-          type: processedGame.gameType
-        });
-
-        return processedGame;
       });
 
     console.log('Final player data:', {
@@ -212,20 +214,18 @@ export default async function handler(req, res) {
       name: `${player.first_name} ${player.last_name}`,
       team: player.team?.full_name,
       games: seasonAverages.games_played,
-      recentGames: lastFiveGames.length,
-      hasRegularGames: regularGames.length > 0,
-      hasPlayoffGames: playoffGames.length > 0,
-      firstGame: lastFiveGames[0] ? {
-        date: lastFiveGames[0].date,
-        isPlayoff: lastFiveGames[0].isPlayoff,
-        type: lastFiveGames[0].gameType,
-        rawGame: lastFiveGames[0]
+      regularGames: regularGames.length,
+      playoffGames: playoffGames.length,
+      firstRegularGame: regularGames[0] ? {
+        date: regularGames[0].game.date,
+        isPlayoff: regularGames[0].game.postseason,
+        type: 'Regular Season'
       } : null,
-      allGames: lastFiveGames.map(g => ({
-        date: g.date,
-        isPlayoff: g.isPlayoff,
-        type: g.gameType
-      }))
+      firstPlayoffGame: playoffGames[0] ? {
+        date: playoffGames[0].game.date,
+        isPlayoff: playoffGames[0].game.postseason,
+        type: 'Playoff'
+      } : null
     });
 
     return res.status(200).json({

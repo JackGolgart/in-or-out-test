@@ -1,124 +1,180 @@
 import { useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
-import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { createClient } from '@supabase/supabase-js';
 
-const LineChart = dynamic(() => import('../components/PerTrendChart'), { ssr: false });
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 export default function Portfolio() {
-  const [picks, setPicks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [summary, setSummary] = useState({ total: 0, in: 0, out: 0 });
-  const [selectedPlayers, setSelectedPlayers] = useState([]);
+  const { user } = useAuth();
+  const [predictions, setPredictions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchPicks = async () => {
-      const session = await supabase.auth.getSession();
-      const user = session?.data?.session?.user;
-      if (!user) return;
+    if (user) {
+      fetchPredictions();
+    }
+  }, [user]);
 
-      const { data, error } = await supabase
-        .from('picks')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+  const fetchPredictions = async () => {
+    try {
+      const response = await fetch('/api/predictions', {
+        headers: {
+          'Authorization': `Bearer ${user.access_token}`
+        }
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch predictions');
+      
+      const data = await response.json();
+      
+      // Fetch current player stats for each prediction
+      const predictionsWithCurrentStats = await Promise.all(
+        data.map(async (prediction) => {
+          const playerResponse = await fetch(`/api/players/${prediction.player_id}`);
+          if (!playerResponse.ok) return prediction;
+          
+          const playerData = await playerResponse.json();
+          return {
+            ...prediction,
+            current_net_rating: playerData.player.net_rating,
+            player_name: `${playerData.player.first_name} ${playerData.player.last_name}`,
+            team_name: playerData.player.team?.full_name
+          };
+        })
+      );
+      
+      setPredictions(predictionsWithCurrentStats);
+    } catch (error) {
+      console.error('Error fetching predictions:', error);
+      setError('Failed to load predictions');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      if (!error && data) {
-        setPicks(data);
+  const calculatePerformance = (prediction) => {
+    if (!prediction.current_net_rating || !prediction.net_rating_at_prediction) return 0;
+    
+    const netRatingChange = prediction.current_net_rating - prediction.net_rating_at_prediction;
+    return prediction.prediction_type === 'in' ? netRatingChange : -netRatingChange;
+  };
 
-        const totals = {
-          total: data.length,
-          in: data.filter(p => p.selection === 'in').length,
-          out: data.filter(p => p.selection === 'out').length,
-        };
-        setSummary(totals);
-      }
+  if (!user) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div className="text-center">
+              <h1 className="text-3xl font-bold text-white mb-4">Please Log In</h1>
+              <p className="text-gray-400">You need to be logged in to view your portfolio.</p>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
-      setLoading(false);
-    };
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div className="flex items-center justify-center h-64">
+              <LoadingSpinner size="lg" />
+              <p className="ml-4 text-gray-300">Loading your portfolio...</p>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
-    fetchPicks();
-  }, []);
-
-  const uniquePlayers = [...new Set(picks.map(p => p.player_name))];
+  if (error) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div className="text-center">
+              <h1 className="text-3xl font-bold text-red-400 mb-4">Error</h1>
+              <p className="text-gray-400">{error}</p>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto px-6 py-10 text-white">
-        <h1 className="text-3xl font-bold mb-4">Your Portfolio</h1>
-
-        {loading ? (
-          <p className="text-purple-300 animate-pulse">Loading picks...</p>
-        ) : picks.length === 0 ? (
-          <p className="text-gray-400">No picks made yet.</p>
-        ) : (
-          <>
-            <div className="mb-6 space-y-1 text-gray-300">
-              <p>Total Picks: <span className="text-white font-semibold">{summary.total}</span></p>
-              <p>IN Picks: <span className="text-green-400 font-semibold">{summary.in}</span></p>
-              <p>OUT Picks: <span className="text-red-400 font-semibold">{summary.out}</span></p>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <h1 className="text-3xl font-bold text-white mb-8">Your Portfolio</h1>
+          
+          {predictions.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-400">You haven't made any predictions yet.</p>
             </div>
-
-            <div className="overflow-x-auto mb-10">
-              <table className="min-w-full text-sm border border-purple-500/20 bg-gray-800 rounded">
-                <thead className="bg-purple-600 text-white">
-                  <tr>
-                    <th className="text-left px-4 py-2">Player</th>
-                    <th className="text-left px-4 py-2">Pick</th>
-                    <th className="text-left px-4 py-2">NET Rating</th>
-                    <th className="text-left px-4 py-2">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {picks.map(pick => (
-                    <tr key={pick.id} className="border-t border-gray-700 hover:bg-gray-700/50">
-                      <td className="px-4 py-2">{pick.player_name}</td>
-                      <td className={`px-4 py-2 ${pick.selection === 'in' ? 'text-green-400' : 'text-red-400'}`}>
-                        {pick.selection.toUpperCase()}
-                      </td>
-                      <td className="px-4 py-2">{pick.initial_net_rating}</td>
-                      <td className="px-4 py-2">{new Date(pick.created_at).toLocaleDateString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          ) : (
+            <div className="grid gap-6">
+              {predictions.map((prediction) => {
+                const performance = calculatePerformance(prediction);
+                const performanceColor = performance > 0 ? 'text-green-400' : 'text-red-400';
+                
+                return (
+                  <div key={prediction.id} className="card-base p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-xl font-semibold text-white">
+                          {prediction.player_name}
+                        </h3>
+                        <p className="text-gray-400">{prediction.team_name}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            prediction.prediction_type === 'in' 
+                              ? 'bg-green-500/20 text-green-400'
+                              : 'bg-red-500/20 text-red-400'
+                          }`}>
+                            {prediction.prediction_type.toUpperCase()}
+                          </span>
+                          <span className={performanceColor}>
+                            {performance > 0 ? '+' : ''}{performance.toFixed(1)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-400 mt-1">
+                          Net Rating: {prediction.current_net_rating?.toFixed(1) || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-gray-700">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-400">Prediction Date</p>
+                          <p className="text-white">
+                            {new Date(prediction.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400">Net Rating at Prediction</p>
+                          <p className="text-white">
+                            {prediction.net_rating_at_prediction?.toFixed(1) || 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-
-            <div className="bg-gray-800 p-4 rounded">
-              <h2 className="text-xl font-semibold mb-3">Compare NET Rating Trends</h2>
-
-              <div className="flex flex-col sm:flex-row gap-4 mb-4">
-                {[0, 1].map(index => (
-                  <select
-                    key={index}
-                    value={selectedPlayers[index] || ''}
-                    onChange={(e) => {
-                      const updated = [...selectedPlayers];
-                      updated[index] = e.target.value;
-                      setSelectedPlayers(updated);
-                    }}
-                    className="p-2 rounded bg-gray-700 text-white"
-                  >
-                    <option value="">Select Player {index + 1}</option>
-                    {uniquePlayers.map(name => (
-                      <option key={name} value={name}>{name}</option>
-                    ))}
-                  </select>
-                ))}
-              </div>
-
-              <LineChart
-                data={picks
-                  .filter(p => selectedPlayers.includes(p.player_name))
-                  .map(p => ({
-                    date: new Date(p.created_at).toLocaleDateString(),
-                    net_rating: parseFloat(p.initial_net_rating),
-                    label: p.player_name,
-                  }))}
-              />
-            </div>
-          </>
-        )}
+          )}
+        </div>
       </div>
     </Layout>
   );

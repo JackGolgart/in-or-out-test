@@ -185,36 +185,30 @@ const handler = async (req, res) => {
     // Use the SDK to fetch players with search
     let response;
     try {
-      // For specific player names, try exact match first
+      // Simplified search parameters with more flexible search
       const searchParams = {
         page: Math.max(1, parseInt(page)),
         per_page: Math.min(100, Math.max(1, parseInt(per_page)))
       };
 
-      // If it looks like a full name, try different formats
+      // If search query contains a space, try searching with just the first name
       if (cleanSearch.includes(' ')) {
-        const [firstName, lastName] = cleanSearch.split(' ');
-        // Try both formats: "firstName lastName" and "lastName, firstName"
-        searchParams.search = `${firstName} ${lastName}`;
-        console.log('Searching with full name formats:', {
-          format1: searchParams.search,
-          format2: `${lastName}, ${firstName}`,
-          original: cleanSearch
-        });
+        const [firstName] = cleanSearch.split(' ');
+        searchParams.search = firstName;
       } else {
         searchParams.search = cleanSearch;
-        console.log('Searching with single term:', searchParams.search);
       }
 
       console.log('Searching with params:', searchParams);
       response = await apiInstance.nba.getPlayers(searchParams);
 
-      // If no results with first format and it's a full name, try the other format
-      if ((!response?.data || response.data.length === 0) && cleanSearch.includes(' ')) {
+      // If we have results, filter them client-side for the full name match
+      if (response?.data?.length > 0 && cleanSearch.includes(' ')) {
         const [firstName, lastName] = cleanSearch.split(' ');
-        searchParams.search = `${lastName}, ${firstName}`;
-        console.log('Trying alternative name format:', searchParams.search);
-        response = await apiInstance.nba.getPlayers(searchParams);
+        response.data = response.data.filter(player => 
+          player.first_name.toLowerCase() === firstName.toLowerCase() &&
+          player.last_name.toLowerCase() === lastName.toLowerCase()
+        );
       }
     } catch (error) {
       console.error('SDK Error:', {
@@ -315,7 +309,7 @@ const handler = async (req, res) => {
           const statsResponse = await apiInstance.nba.getStats({
             player_ids: [player.id],
             seasons: [currentSeason],
-            per_page: 25
+            per_page: 100 // Increased to ensure we get all games
           });
 
           console.log('Regular stats response:', {
@@ -340,13 +334,21 @@ const handler = async (req, res) => {
 
           // Calculate season averages
           const stats = statsResponse.data;
-          const totalGames = stats.length;
           
+          // Filter out games where the player didn't play (minutes = 0 or '00')
+          const playedGames = stats.filter(g => {
+            const minutes = g.min;
+            return minutes && minutes !== '00' && minutes !== '0';
+          });
+
           const seasonAverages = {
-            games_played: totalGames,
-            pts: (stats.reduce((sum, game) => sum + (game.pts || 0), 0) / totalGames).toFixed(1),
-            reb: (stats.reduce((sum, game) => sum + (game.reb || 0), 0) / totalGames).toFixed(1),
-            ast: (stats.reduce((sum, game) => sum + (game.ast || 0), 0) / totalGames).toFixed(1)
+            games_played: playedGames.length,
+            pts: playedGames.length > 0 ? 
+              (playedGames.reduce((sum, game) => sum + (game.pts || 0), 0) / playedGames.length).toFixed(1) : '0.0',
+            reb: playedGames.length > 0 ? 
+              (playedGames.reduce((sum, game) => sum + (game.reb || 0), 0) / playedGames.length).toFixed(1) : '0.0',
+            ast: playedGames.length > 0 ? 
+              (playedGames.reduce((sum, game) => sum + (game.ast || 0), 0) / playedGames.length).toFixed(1) : '0.0'
           };
 
           const finalStats = {

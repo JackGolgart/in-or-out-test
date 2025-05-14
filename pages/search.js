@@ -67,6 +67,11 @@ export default function SearchPage() {
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [loadingPlayerId, setLoadingPlayerId] = useState(null);
+
+  const handlePlayerClick = (playerId) => {
+    setLoadingPlayerId(playerId);
+  };
 
   useEffect(() => {
     if (!query) {
@@ -180,30 +185,54 @@ export default function SearchPage() {
                   ))
                 ) : players.length > 0 ? (
                   players.map((player) => (
-                    <div key={player.id} className={styles.playerCard}>
-                      <Link href={`/player/${player.id}`} className={styles.playerLink}>
-                        <div className={styles.playerInfo}>
-                          <h2>{player.first_name} {player.last_name}</h2>
-                          <p>{player.position} - {player.team?.full_name}</p>
+                    <Link 
+                      key={player.id} 
+                      href={`/player/${player.id}`}
+                      onClick={() => handlePlayerClick(player.id)}
+                      className="card-interactive group cursor-pointer relative"
+                    >
+                      {loadingPlayerId === player.id && (
+                        <div className="absolute inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center rounded-lg z-10">
+                          <LoadingSpinner size="md" />
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <JerseyAvatar
+                            teamAbbr={player.team.abbreviation}
+                            firstName={player.first_name}
+                            lastName={player.last_name}
+                            size="sm"
+                          />
+                          <div>
+                            <h3 className="text-lg font-semibold text-white group-hover:text-purple-300 transition-colors duration-300">
+                              {player.first_name} {player.last_name}
+                            </h3>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm text-gray-400">{player.position}</span>
+                              <span className="text-gray-600">•</span>
+                              <span className="text-sm font-medium text-gray-300">{player.team.full_name}</span>
+                            </div>
+                          </div>
                         </div>
                         {player.pts !== undefined && (
-                          <div className={styles.stats}>
-                            <div className={styles.stat}>
-                              <span className={styles.statValue}>{player.pts}</span>
-                              <span className={styles.statLabel}>PPG</span>
+                          <div className="flex space-x-6">
+                            <div className="text-center">
+                              <span className="text-white font-medium block">{player.pts}</span>
+                              <span className="text-gray-400 text-sm">PPG</span>
                             </div>
-                            <div className={styles.stat}>
-                              <span className={styles.statValue}>{player.reb}</span>
-                              <span className={styles.statLabel}>RPG</span>
+                            <div className="text-center">
+                              <span className="text-white font-medium block">{player.reb}</span>
+                              <span className="text-gray-400 text-sm">RPG</span>
                             </div>
-                            <div className={styles.stat}>
-                              <span className={styles.statValue}>{player.ast}</span>
-                              <span className={styles.statLabel}>APG</span>
+                            <div className="text-center">
+                              <span className="text-white font-medium block">{player.ast}</span>
+                              <span className="text-gray-400 text-sm">APG</span>
                             </div>
                           </div>
                         )}
-                      </Link>
-                    </div>
+                      </div>
+                    </Link>
                   ))
                 ) : (
                   <div className="col-span-full text-center py-12">

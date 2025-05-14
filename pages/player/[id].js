@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 import 'swiper/css/pagination';
@@ -37,18 +37,46 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Filter recent games based on showPlayoffs state
-  const filteredRecentGames = recentGames.filter(game => {
-    const matches = game.isPlayoff === showPlayoffs;
-    console.log('Filtering game:', {
-      date: game.date,
-      isPlayoff: game.isPlayoff,
+  const filteredRecentGames = useMemo(() => {
+    console.log('Filtering games:', {
+      totalGames: playerData?.recent_games?.length || 0,
       showPlayoffs,
-      matches,
-      gameType: game.gameType,
-      rawGame: game // Log the entire game object
+      firstGame: playerData?.recent_games?.[0]
     });
-    return matches;
-  }).slice(0, 5);
+
+    if (!playerData?.recent_games) return [];
+
+    return playerData.recent_games
+      .filter(game => {
+        const isPlayoff = game.isPlayoff === true;
+        console.log('Filtering game:', {
+          date: game.date,
+          isPlayoff,
+          showPlayoffs,
+          matches: isPlayoff === showPlayoffs
+        });
+        return isPlayoff === showPlayoffs;
+      });
+  }, [playerData?.recent_games, showPlayoffs]);
+
+  // Update averages based on showPlayoffs state
+  const averages = useMemo(() => {
+    if (!playerData) return null;
+    return showPlayoffs ? playerData.playoff_averages : playerData.regular_averages;
+  }, [playerData, showPlayoffs]);
+
+  // Update state when props change
+  useEffect(() => {
+    if (playerData) {
+      console.log('Updating player data:', {
+        hasRegularGames: playerData.regular_averages?.games_played > 0,
+        hasPlayoffGames: playerData.playoff_averages?.games_played > 0,
+        regularGames: playerData.recent_games?.filter(g => !g.isPlayoff).length || 0,
+        playoffGames: playerData.recent_games?.filter(g => g.isPlayoff).length || 0
+      });
+      setShowPlayoffs(false); // Default to regular season
+    }
+  }, [playerData]);
 
   // Fetch prediction only when user or player ID changes
   useEffect(() => {
@@ -101,36 +129,6 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
       setIsSubmitting(false);
     }
   };
-
-  // Choose which averages to show
-  const averages = showPlayoffs ? playerData?.playoff_averages : playerData?.regular_averages;
-
-  // Update state when props change
-  useEffect(() => {
-    if (player) {
-      console.log('Updating player data:', {
-        isInPlayoffs: player.is_in_playoffs,
-        regularGames: player.regular_averages?.games_played,
-        playoffGames: player.playoff_averages?.games_played,
-        recentGames: player.recent_games?.length,
-        firstGame: player.recent_games?.[0] ? {
-          date: player.recent_games[0].date,
-          isPlayoff: player.recent_games[0].isPlayoff,
-          type: player.recent_games[0].gameType,
-          rawGame: player.recent_games[0] // Log the entire first game
-        } : null,
-        allGames: player.recent_games?.map(g => ({
-          date: g.date,
-          isPlayoff: g.isPlayoff,
-          type: g.gameType
-        }))
-      });
-      setPlayerData(player);
-      setSeasonStats(stats);
-      setRecentGames(gameStats);
-      setHistory(playerHistory);
-    }
-  }, [player, stats, gameStats, playerHistory]);
 
   // Handle toggle change
   const handleToggleChange = () => {
