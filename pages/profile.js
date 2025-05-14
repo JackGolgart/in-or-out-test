@@ -8,51 +8,88 @@ export default function Profile() {
   const [picks, setPicks] = useState([]);
   const [badges, setBadges] = useState([]);
   const [summary, setSummary] = useState({ in: 0, out: 0 });
+  const [error, setError] = useState('');
+
+  // Update summary whenever picks change
+  useEffect(() => {
+    setSummary({
+      in: picks.filter(p => p.prediction_type === 'in').length,
+      out: picks.filter(p => p.prediction_type === 'out').length,
+    });
+  }, [picks]);
 
   useEffect(() => {
     const loadData = async () => {
-      const session = await supabase.auth.getSession();
-      const user = session?.data?.session?.user;
-      if (!user) return;
+      try {
+        const session = await supabase.auth.getSession();
+        const user = session?.data?.session?.user;
+        if (!user) return;
 
-      const { data: profile } = await supabase.from('users').select('*').eq('id', user.id).single();
-      if (profile?.username) setUsername(profile.username);
+        const { data: profile, error: profileError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (profileError) throw profileError;
+        if (profile?.username) setUsername(profile.username);
 
-      const { data: picksData } = await supabase
-        .from('picks')
-        .select('*')
-        .eq('user_id', user.id);
+        const { data: picksData, error: picksError } = await supabase
+          .from('picks')
+          .select('*')
+          .eq('user_id', user.id);
 
-      const { data: badgeData } = await supabase
-        .from('user_badges')
-        .select('earned_at, badges(name, description, icon)')
-        .eq('user_id', user.id);
+        if (picksError) throw picksError;
 
-      setPicks(picksData);
-      setBadges(badgeData || []);
+        const { data: badgeData, error: badgeError } = await supabase
+          .from('user_badges')
+          .select('earned_at, badges(name, description, icon)')
+          .eq('user_id', user.id);
 
-      setSummary({
-        in: picksData.filter(p => p.selection === 'in').length,
-        out: picksData.filter(p => p.selection === 'out').length,
-      });
+        if (badgeError) throw badgeError;
+
+        setPicks(picksData || []);
+        setBadges(badgeData || []);
+      } catch (error) {
+        console.error('Error loading profile data:', error);
+        setError('Failed to load profile data');
+      }
     };
 
     loadData();
   }, []);
 
   const saveUsername = async () => {
-    const session = await supabase.auth.getSession();
-    const user = session?.data?.session?.user;
-    if (!user) return;
+    try {
+      setError('');
+      const session = await supabase.auth.getSession();
+      const user = session?.data?.session?.user;
+      if (!user) return;
 
-    await supabase.from('users').update({ username }).eq('id', user.id);
-    setEditing(false);
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ username })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+      
+      setEditing(false);
+    } catch (error) {
+      console.error('Error saving username:', error);
+      setError('Failed to save username');
+    }
   };
 
   return (
     <Layout>
       <div className="max-w-3xl mx-auto p-6 text-white">
         <h1 className="text-3xl font-bold mb-4">Your Profile</h1>
+
+        {error && (
+          <div className="bg-red-500 text-white p-3 rounded mb-4">
+            {error}
+          </div>
+        )}
 
         <div className="mb-6">
           <label className="text-sm text-gray-300">Username:</label>
@@ -65,6 +102,7 @@ export default function Profile() {
                 className="bg-gray-800 p-2 rounded"
               />
               <button onClick={saveUsername} className="bg-purple-600 px-4 py-2 rounded">Save</button>
+              <button onClick={() => setEditing(false)} className="bg-gray-600 px-4 py-2 rounded">Cancel</button>
             </div>
           ) : (
             <div className="flex items-center gap-2 mt-1">
