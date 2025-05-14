@@ -39,9 +39,11 @@ const PlayerCard = ({ player, onClick }) => {
             <h3 className="text-lg font-semibold text-white group-hover:text-purple-300 transition-colors duration-300">
               {player.first_name} {player.last_name}
             </h3>
-            <p className="text-sm text-gray-400">
-              {player.team.full_name}
-            </p>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-400">{player.position}</span>
+              <span className="text-gray-600">•</span>
+              <span className="text-sm font-medium text-gray-300">{player.team.full_name}</span>
+            </div>
           </div>
         </div>
         <div className="text-right">

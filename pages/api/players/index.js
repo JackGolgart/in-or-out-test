@@ -273,27 +273,39 @@ const handler = async (req, res) => {
           const recentStatsResponse = await apiInstance.nba.getStats({
             player_ids: [player.id],
             seasons: [currentSeason],
-            per_page: 1,
-            sort: ['-game.date']
+            per_page: 100, // Increased to ensure we get enough games
+            sort: ['-game.date'] // Sort by most recent first
           });
 
+          // Get today's date for filtering
+          const today = new Date();
+          today.setHours(23, 59, 59, 999); // Set to end of day to include today's games
+
+          // Filter games up to today's date and sort by most recent
+          const recentGames = (recentStatsResponse?.data || [])
+            .filter(g => {
+              const gameDate = new Date(g.game.date);
+              return gameDate <= today;
+            })
+            .sort((a, b) => new Date(b.game.date) - new Date(a.game.date));
+
           // Update team information if we have recent game data
-          if (recentStatsResponse?.data?.length > 0) {
-            const recentGame = recentStatsResponse.data[0];
+          if (recentGames.length > 0) {
+            const mostRecent = recentGames[0];
             console.log('Recent game data:', {
-              date: recentGame.game.date,
-              team: recentGame.team?.full_name,
-              opponent: recentGame.game.home_team_id === recentGame.team.id ? 
-                'vs ' + recentGame.game.visitor_team_id : 
-                'at ' + recentGame.game.home_team_id
+              date: mostRecent.game.date,
+              team: mostRecent.team?.full_name,
+              opponent: mostRecent.game.home_team_id === mostRecent.team.id ? 
+                'vs ' + mostRecent.game.visitor_team_id : 
+                'at ' + mostRecent.game.home_team_id
             });
 
-            if (recentGame.team) {
+            if (mostRecent.team) {
               console.log('Updating team info from recent game:', {
                 oldTeam: player.team?.full_name,
-                newTeam: recentGame.team.full_name
+                newTeam: mostRecent.team.full_name
               });
-              player.team = recentGame.team;
+              player.team = mostRecent.team;
             }
           } else {
             console.log('No recent games found for team update');

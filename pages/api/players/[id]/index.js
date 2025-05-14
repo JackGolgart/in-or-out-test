@@ -117,13 +117,13 @@ export default async function handler(req, res) {
 
     // Get today's date for filtering
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setHours(23, 59, 59, 999); // Set to end of day to include today's games
 
     // Filter games up to today's date
     const recentGames = allGames.filter(g => {
       const gameDate = new Date(g.game.date);
       return gameDate <= today;
-    });
+    }).sort((a, b) => new Date(b.game.date) - new Date(a.game.date)); // Ensure proper sorting
 
     // Check if most recent games are playoff games
     const isInPlayoffs = recentGames.length > 0 && recentGames[0].game.postseason;
@@ -185,7 +185,8 @@ export default async function handler(req, res) {
       minutes: game.min,
       result: game.game.home_team_score > game.game.visitor_team_score ? 'W' : 'L',
       score: `${game.game.home_team_score}-${game.game.visitor_team_score}`,
-      isPlayoff: game.game.postseason
+      isPlayoff: game.game.postseason,
+      gameType: game.game.postseason ? 'Playoff' : 'Regular Season'
     }));
 
     console.log('Final player data:', {

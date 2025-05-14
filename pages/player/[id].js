@@ -9,6 +9,7 @@ import Layout from '../../components/Layout';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import Link from 'next/link';
 import styles from '../../styles/Player.module.css';
+import getTeamLogo from '../../lib/teamLogos';
 
 // Function to get current NBA season
 function getCurrentNBASeason() {
@@ -118,6 +119,15 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
               </Link>
             </div>
             <div className="text-center">
+              {playerData.team && (
+                <div className="mb-6 flex justify-center">
+                  <img 
+                    src={getTeamLogo(playerData.team.abbreviation)} 
+                    alt={`${playerData.team.full_name} logo`}
+                    className="w-24 h-24 object-contain"
+                  />
+                </div>
+              )}
               <h1 className="text-4xl sm:text-5xl font-bold text-white mb-4">
                 {playerData.first_name} {playerData.last_name}
               </h1>
@@ -180,7 +190,16 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
                 {recentGames.map((game, index) => (
                   <div key={index} className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
                     <div className="flex-1">
-                      <div className="text-gray-400 text-sm">{formatDate(game.date)}</div>
+                      <div className="flex items-center space-x-2">
+                        <div className="text-gray-400 text-sm">{formatDate(game.date)}</div>
+                        <span className={`px-2 py-0.5 text-xs rounded-full ${
+                          game.isPlayoff 
+                            ? 'bg-purple-600 text-white' 
+                            : 'bg-gray-600 text-gray-300'
+                        }`}>
+                          {game.gameType}
+                        </span>
+                      </div>
                       <div className="text-white font-medium">{game.result}</div>
                       <div className="text-gray-400 text-sm">{game.score}</div>
                     </div>
