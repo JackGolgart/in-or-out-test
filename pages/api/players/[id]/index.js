@@ -2,8 +2,20 @@ import { getApiClient } from '../../../../lib/bdlClient';
 
 // Function to get current NBA season
 function getCurrentNBASeason() {
-  // For the 2024-2025 season, we'll use 2024 as the season year
-  return 2024;
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1; // JavaScript months are 0-based
+  
+  // NBA season starts in October (month 10)
+  // If we're before October, use previous year as the season start
+  return month < 10 ? year - 1 : year;
+}
+
+// Function to get season start and end dates
+function getSeasonDates(season) {
+  const startDate = new Date(season, 9, 1); // October 1st
+  const endDate = new Date(season + 1, 5, 30); // June 30th
+  return { startDate, endDate };
 }
 
 function calculateAverages(games) {
@@ -34,8 +46,11 @@ export default async function handler(req, res) {
   try {
     const apiInstance = getApiClient();
     const currentSeason = getCurrentNBASeason();
-    const requestedSeason = season ? parseInt(season) : currentSeason;
-    console.log('Using season:', requestedSeason);
+    const { startDate, endDate } = getSeasonDates(currentSeason);
+
+    // Format dates for API
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
 
     // First, get the player's basic information
     console.log('Fetching player data for ID:', id);
@@ -63,18 +78,19 @@ export default async function handler(req, res) {
       initialTeam: player.team?.full_name
     });
 
-    // Get all stats for the requested season (max 100 games)
-    console.log('Fetching stats for season:', requestedSeason);
+    // Fetch regular season stats
     const statsResponse = await apiInstance.nba.getStats({
       player_ids: [parseInt(id)],
-      seasons: [requestedSeason],
-      per_page: 100,
+      seasons: [currentSeason],
+      per_page: 82, // Regular season games
+      start_date: startDateStr,
+      end_date: endDateStr,
       sort: ['-game.date']
     }).catch(error => {
       console.error('Error fetching player stats:', {
         error: error.message,
         playerId: id,
-        season: requestedSeason,
+        season: currentSeason,
         apiVersion: 'v1'
       });
       throw error;
@@ -91,10 +107,10 @@ export default async function handler(req, res) {
 
     // For previous seasons, use API's season averages if not current season
     let seasonAverages = regularAverages;
-    if (requestedSeason !== currentSeason) {
+    if (currentSeason !== currentSeason) {
       // Try to fetch season averages from API
       try {
-        const avgRes = await fetch(`https://api.balldontlie.io/v1/season_averages?season=${requestedSeason}&player_ids[]=${id}`, {
+        const avgRes = await fetch(`https://api.balldontlie.io/v1/season_averages?season=${currentSeason}&player_ids[]=${id}`, {
           headers: {
             Authorization: `Bearer ${process.env.BALLDONTLIE_API_KEY}`,
           },
@@ -159,7 +175,7 @@ export default async function handler(req, res) {
       message: error.message,
       stack: error.stack,
       playerId: id,
-      season: requestedSeason
+      season: currentSeason
     });
     
     // Return more specific error information

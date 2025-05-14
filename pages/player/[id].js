@@ -60,10 +60,12 @@ export default function PlayerPage() {
   if (loading) {
     return (
       <Layout>
-        <div className={styles.container}>
-          <div className={styles.loading}>
-            <LoadingSpinner size="lg" />
-            <p>Loading player data...</p>
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div className="flex items-center justify-center h-64">
+              <LoadingSpinner size="lg" />
+              <p className="ml-4 text-gray-300">Loading player data...</p>
+            </div>
           </div>
         </div>
       </Layout>
@@ -73,13 +75,15 @@ export default function PlayerPage() {
   if (error) {
     return (
       <Layout>
-        <div className={styles.container}>
-          <div className={styles.error}>
-            <h2>Error</h2>
-            <p>{error}</p>
-            <Link href="/search" className={styles.backLink}>
-              Back to Search
-            </Link>
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-red-400 mb-4">Error</h2>
+              <p className="text-gray-300 mb-8">{error}</p>
+              <Link href="/search" className="btn-primary">
+                Back to Search
+              </Link>
+            </div>
           </div>
         </div>
       </Layout>
@@ -89,13 +93,15 @@ export default function PlayerPage() {
   if (!player) {
     return (
       <Layout>
-        <div className={styles.container}>
-          <div className={styles.error}>
-            <h2>Player Not Found</h2>
-            <p>The requested player could not be found.</p>
-            <Link href="/search" className={styles.backLink}>
-              Back to Search
-            </Link>
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-300 mb-4">Player Not Found</h2>
+              <p className="text-gray-400 mb-8">The requested player could not be found.</p>
+              <Link href="/search" className="btn-primary">
+                Back to Search
+              </Link>
+            </div>
           </div>
         </div>
       </Layout>
@@ -116,76 +122,98 @@ export default function PlayerPage() {
 
   return (
     <Layout>
-      <div className={styles.container}>
-        <div className={styles.header}>
-          <Link href="/search" className={styles.backLink}>
-            ← Back to Search
-          </Link>
-          <h1>{player.first_name} {player.last_name}</h1>
-          <div className={styles.teamInfo}>
-            <h2>{player.team?.full_name || 'No Team'}</h2>
-            <p>#{player.jersey_number} | {player.position}</p>
-          </div>
-        </div>
-
-        {/* Switch for regular/playoff averages */}
-        <div className={styles.toggleRow}>
-          <span className={styles.toggleLabel}>Regular Season</span>
-          <label className={styles.switch}>
-            <input
-              type="checkbox"
-              checked={showPlayoff}
-              onChange={() => setShowPlayoff((v) => !v)}
-            />
-            <span className={styles.slider}></span>
-          </label>
-          <span className={styles.toggleLabel}>Playoffs</span>
-        </div>
-
-        <div className={styles.stats}>
-          <h3>{toggleLabel}</h3>
-          <div className={styles.statsGrid}>
-            <div className={styles.stat}>
-              <span className={styles.statValue}>{averages.points.toFixed(1)}</span>
-              <span className={styles.statLabel}>Points</span>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
+        {/* Player Header */}
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-blue-600/20 to-transparent"></div>
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="flex items-center justify-between mb-8">
+              <Link href="/search" className="text-gray-400 hover:text-white transition-colors">
+                ← Back to Search
+              </Link>
             </div>
-            <div className={styles.stat}>
-              <span className={styles.statValue}>{averages.rebounds.toFixed(1)}</span>
-              <span className={styles.statLabel}>Rebounds</span>
-            </div>
-            <div className={styles.stat}>
-              <span className={styles.statValue}>{averages.assists.toFixed(1)}</span>
-              <span className={styles.statLabel}>Assists</span>
-            </div>
-            <div className={styles.stat}>
-              <span className={styles.statValue}>{averages.games_played}</span>
-              <span className={styles.statLabel}>Games</span>
+            <div className="text-center">
+              <h1 className="text-4xl sm:text-5xl font-bold text-white mb-4">
+                {player.first_name} {player.last_name}
+              </h1>
+              <div className="text-lg text-gray-300">
+                <p className="mb-2">#{player.jersey_number} | {player.position}</p>
+                <p>{player.team?.full_name || 'No Team'}</p>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className={styles.recentGames}>
-          <h3>Recent Games</h3>
-          {player.recent_games.length > 0 ? (
-            <div className={styles.gamesList}>
-              {player.recent_games.map((game, index) => (
-                <div key={index} className={styles.game}>
-                  <div className={styles.gameDate}>{formatDate(game.date)}</div>
-                  <div className={styles.gameResult}>
-                    <span className={styles.result}>{game.result}</span>
-                    <span className={styles.score}>{game.score}</span>
-                  </div>
-                  <div className={styles.gameStats}>
-                    <span>{game.points} pts</span>
-                    <span>{game.rebounds} reb</span>
-                    <span>{game.assists} ast</span>
-                  </div>
-                </div>
-              ))}
+        {/* Stats Section */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          {/* Switch for regular/playoff averages */}
+          <div className="flex items-center justify-center mb-8">
+            <span className="text-gray-400 mr-4">Regular Season</span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showPlayoff}
+                onChange={() => setShowPlayoff((v) => !v)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+            </label>
+            <span className="text-gray-400 ml-4">Playoffs</span>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+            <div className="card-base p-6 text-center">
+              <span className="text-3xl font-bold text-white block mb-2">{averages.points.toFixed(1)}</span>
+              <span className="text-gray-400">Points</span>
             </div>
-          ) : (
-            <p>No recent games available</p>
-          )}
+            <div className="card-base p-6 text-center">
+              <span className="text-3xl font-bold text-white block mb-2">{averages.rebounds.toFixed(1)}</span>
+              <span className="text-gray-400">Rebounds</span>
+            </div>
+            <div className="card-base p-6 text-center">
+              <span className="text-3xl font-bold text-white block mb-2">{averages.assists.toFixed(1)}</span>
+              <span className="text-gray-400">Assists</span>
+            </div>
+            <div className="card-base p-6 text-center">
+              <span className="text-3xl font-bold text-white block mb-2">{averages.games_played}</span>
+              <span className="text-gray-400">Games</span>
+            </div>
+          </div>
+
+          {/* Recent Games */}
+          <div className="card-base p-6">
+            <h3 className="text-xl font-semibold text-white mb-6">Recent Games</h3>
+            {player.recent_games.length > 0 ? (
+              <div className="space-y-4">
+                {player.recent_games.map((game, index) => (
+                  <div key={index} className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
+                    <div className="flex-1">
+                      <div className="text-gray-400 text-sm">{formatDate(game.date)}</div>
+                      <div className="text-white font-medium">{game.result}</div>
+                      <div className="text-gray-400 text-sm">{game.score}</div>
+                    </div>
+                    <div className="flex space-x-6">
+                      <div className="text-center">
+                        <span className="text-white font-medium block">{game.points}</span>
+                        <span className="text-gray-400 text-sm">PTS</span>
+                      </div>
+                      <div className="text-center">
+                        <span className="text-white font-medium block">{game.rebounds}</span>
+                        <span className="text-gray-400 text-sm">REB</span>
+                      </div>
+                      <div className="text-center">
+                        <span className="text-white font-medium block">{game.assists}</span>
+                        <span className="text-gray-400 text-sm">AST</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-400 text-center py-8">No recent games available</p>
+            )}
+          </div>
         </div>
       </div>
     </Layout>
@@ -245,7 +273,8 @@ export async function getServerSideProps({ params }) {
     const statsRes = await apiInstance.nba.getStats({ 
       player_ids: [parseInt(id)],
       seasons: [currentSeason],
-      per_page: 10
+      per_page: 10,
+      sort: ['-game.date']
     });
 
     const recentGames = statsRes.data || [];
