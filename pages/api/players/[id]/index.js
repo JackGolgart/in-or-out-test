@@ -61,7 +61,8 @@ export default async function handler(req, res) {
       console.error('Error fetching player data:', {
         error: error.message,
         playerId: id,
-        apiVersion: 'v1'
+        apiVersion: 'v1',
+        stack: error.stack
       });
       throw error;
     });
@@ -75,10 +76,18 @@ export default async function handler(req, res) {
     console.log('Found player:', {
       id: player.id,
       name: `${player.first_name} ${player.last_name}`,
-      initialTeam: player.team?.full_name
+      initialTeam: player.team?.full_name,
+      position: player.position,
+      jerseyNumber: player.jersey_number
     });
 
     // Fetch regular season stats
+    console.log('Fetching stats for player:', {
+      id: player.id,
+      name: `${player.first_name} ${player.last_name}`,
+      season: currentSeason
+    });
+
     const statsResponse = await apiInstance.nba.getStats({
       player_ids: [parseInt(id)],
       seasons: [currentSeason],
@@ -89,11 +98,21 @@ export default async function handler(req, res) {
         error: error.message,
         playerId: id,
         season: currentSeason,
-        apiVersion: 'v1'
+        apiVersion: 'v1',
+        stack: error.stack
       });
       throw error;
     });
+
     const allGames = statsResponse?.data || [];
+    console.log('Stats response:', {
+      totalGames: allGames.length,
+      firstGame: allGames[0] ? {
+        date: allGames[0].game.date,
+        isPlayoff: allGames[0].game.postseason,
+        status: allGames[0].game.status
+      } : null
+    });
 
     // Get today's date for filtering
     const today = new Date();
@@ -112,6 +131,14 @@ export default async function handler(req, res) {
     const regularGames = recentGames.filter(g => !g.game.postseason);
     const playoffGames = recentGames.filter(g => g.game.postseason);
 
+    console.log('Filtered games:', {
+      totalGames: allGames.length,
+      recentGames: recentGames.length,
+      regularGames: regularGames.length,
+      playoffGames: playoffGames.length,
+      isInPlayoffs
+    });
+
     // Calculate averages
     const regularAverages = calculateAverages(regularGames);
     const playoffAverages = calculateAverages(playoffGames);
@@ -123,7 +150,13 @@ export default async function handler(req, res) {
     let currentTeam = player.team;
     if (recentGames.length > 0) {
       const mostRecent = recentGames[0];
-      if (mostRecent.team) currentTeam = mostRecent.team;
+      if (mostRecent.team) {
+        console.log('Updating team from recent game:', {
+          oldTeam: currentTeam?.full_name,
+          newTeam: mostRecent.team.full_name
+        });
+        currentTeam = mostRecent.team;
+      }
     }
     player.team = currentTeam;
 
@@ -146,7 +179,9 @@ export default async function handler(req, res) {
       team: player.team?.full_name,
       games: seasonAverages.games_played,
       recentGames: lastFiveGames.length,
-      isInPlayoffs
+      isInPlayoffs,
+      hasRegularGames: regularGames.length > 0,
+      hasPlayoffGames: playoffGames.length > 0
     });
 
     return res.status(200).json({

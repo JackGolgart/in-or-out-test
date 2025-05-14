@@ -217,15 +217,17 @@ export async function getServerSideProps({ params }) {
     console.log('Fetching player data for ID:', id);
     
     // Fetch player data from our API endpoint
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-    const playerRes = await fetch(`${apiUrl}/api/players/${id}`);
-    const playerData = await playerRes.json();
-    
+    const playerRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/players/${id}`);
     if (!playerRes.ok) {
-      console.error('Player API error:', playerData);
+      const errorData = await playerRes.json();
+      console.error('Player API error:', {
+        status: playerRes.status,
+        error: errorData,
+        playerId: id
+      });
       return {
         props: {
-          error: playerData.error || 'Failed to load player data',
+          error: errorData.error || 'Failed to load player data',
           player: null,
           stats: null,
           gameStats: [],
@@ -234,8 +236,14 @@ export async function getServerSideProps({ params }) {
       };
     }
 
-    const { player, seasonAverages } = playerData;
-    if (!player) {
+    const playerData = await playerRes.json();
+    console.log('Player API response:', {
+      hasPlayer: !!playerData?.player,
+      hasStats: !!playerData?.player?.season_averages,
+      playerId: id
+    });
+
+    if (!playerData?.player) {
       console.error('Player not found in response:', playerData);
       return {
         props: {
@@ -248,38 +256,38 @@ export async function getServerSideProps({ params }) {
       };
     }
 
-    console.log('Successfully fetched player data:', {
-      id: player.id,
-      name: `${player.first_name} ${player.last_name}`,
-      hasStats: !!seasonAverages
-    });
-
     // Fetch player history
-    const historyRes = await fetch(`${apiUrl}/api/players/${id}/history`);
-    const history = await historyRes.json();
+    let history = [];
+    try {
+      const historyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/players/${id}/history`);
+      if (historyRes.ok) {
+        history = await historyRes.json();
+      } else {
+        console.error('Failed to fetch player history:', await historyRes.json());
+      }
+    } catch (historyError) {
+      console.error('Error fetching player history:', historyError);
+    }
 
-    // Fetch recent games
-    const currentSeason = getCurrentNBASeason();
-    const apiInstance = getApiClient();
-    const statsRes = await apiInstance.nba.getStats({ 
-      player_ids: [parseInt(id)],
-      seasons: [currentSeason],
-      per_page: 10,
-      sort: ['-game.date']
-    });
-
-    const recentGames = statsRes.data || [];
+    // Get recent games from the player data
+    const recentGames = playerData.player.recent_games || [];
 
     return {
       props: {
-        player,
-        stats: seasonAverages,
+        player: playerData.player,
+        stats: playerData.player.season_averages,
         gameStats: recentGames,
-        playerHistory: history
+        playerHistory: history,
+        error: null
       }
     };
   } catch (error) {
-    console.error('Error fetching player data:', error);
+    console.error('Error in getServerSideProps:', {
+      message: error.message,
+      stack: error.stack,
+      playerId: params?.id
+    });
+    
     return {
       props: {
         error: 'Failed to load player data',
