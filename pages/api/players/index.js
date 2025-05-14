@@ -1,4 +1,4 @@
-const { initializeApi } = require('../../../lib/bdlClient');
+const { getApiClient } = require('../../../lib/bdlClient');
 
 // Error handler wrapper to ensure we never send HTML responses
 const errorHandler = (res, status, error) => {
@@ -166,7 +166,7 @@ const handler = async (req, res) => {
     let apiInstance;
     try {
       console.log('Initializing API client...');
-      apiInstance = initializeApi('v1'); // Use v1 for basic player data
+      apiInstance = getApiClient('v1'); // Use v1 for basic player data
       if (!apiInstance) {
         throw new Error('Failed to initialize API client');
       }
@@ -256,7 +256,7 @@ const handler = async (req, res) => {
     // Initialize v2 API for advanced stats
     let apiV2;
     try {
-      apiV2 = initializeApi('v2');
+      apiV2 = getApiClient('v2');
     } catch (error) {
       console.error('Failed to initialize v2 API for advanced stats:', error);
       // Continue without advanced stats
