@@ -97,8 +97,18 @@ export default async function handler(req, res) {
     });
     const allGames = statsResponse?.data || [];
 
-    // Filter out preseason games (status === 'Preseason' or postseason === false and date before regular season start)
-    const regularGames = allGames.filter(g => !g.game.postseason && g.game.status !== 'Preseason');
+    // Filter out preseason games and ensure we're only getting regular season games
+    const regularGames = allGames.filter(g => {
+      const gameDate = new Date(g.game.date);
+      const seasonStart = new Date(currentSeason, 9, 1); // October 1st
+      const seasonEnd = new Date(currentSeason + 1, 3, 15); // April 15th (end of regular season)
+      
+      return !g.game.postseason && 
+             gameDate >= seasonStart && 
+             gameDate <= seasonEnd &&
+             g.game.status !== 'Preseason';
+    });
+
     const playoffGames = allGames.filter(g => g.game.postseason);
 
     // Calculate averages
