@@ -7,7 +7,7 @@ function MyApp({ Component, pageProps }) {
     <AuthProvider>
       <Head>
         <title>In-or-Out</title>
-        <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="/favicon.ico?v=2" type="image/x-icon" />
         <meta name="theme-color" content="#000000" />
       </Head>
       <Component {...pageProps} />

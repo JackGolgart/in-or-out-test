@@ -74,7 +74,7 @@ export default function Layout({ children }) {
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="description" content="Track NBA player performance and make predictions" />
         <meta name="theme-color" content="#1f2937" />
-        <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="/favicon.ico?v=2" type="image/x-icon" />
       </Head>
 
       <header className="bg-gray-900/90 backdrop-blur-sm border-b border-gray-800/50 sticky top-0 z-50">
