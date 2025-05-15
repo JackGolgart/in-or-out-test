@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { getSupabaseClient } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabase';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -25,8 +25,6 @@ ChartJS.register(
   Tooltip,
   Legend
 );
-
-const supabase = getSupabaseClient();
 
 export default function Portfolio() {
   const { user, session } = useAuth();

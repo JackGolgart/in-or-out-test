@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { getSupabaseClient } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabase';
 
 // Create the auth context with a default value
 const AuthContext = createContext({});
@@ -9,7 +9,6 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
-  const supabase = getSupabaseClient();
 
   useEffect(() => {
     // Check active sessions and sets the user
