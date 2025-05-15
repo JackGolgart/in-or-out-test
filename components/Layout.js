@@ -74,17 +74,14 @@ export default function Layout({ children }) {
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="description" content="Track NBA player performance and make predictions" />
         <meta name="theme-color" content="#1f2937" />
-        <link rel="icon" href="/basketball.svg" type="image/svg+xml" />
+        <link rel="icon" href="/favicon.ico" type="image/x-icon" />
       </Head>
 
       <header className="bg-gray-900/90 backdrop-blur-sm border-b border-gray-800/50 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2 text-xl font-bold text-white hover:text-purple-400 transition-colors duration-300">
-              <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
-              </svg>
-              <span>In-or-Out</span>
+              <img src="/logos/in-or-out-logo.png" alt="In-or-Out Logo" className="h-8 w-auto" />
             </Link>
 
             {/* Desktop Navigation */}
