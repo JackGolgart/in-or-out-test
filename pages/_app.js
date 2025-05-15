@@ -7,8 +7,7 @@ function MyApp({ Component, pageProps }) {
     <AuthProvider>
       <Head>
         <title>In-or-Out</title>
-        <link rel="icon" href="/basketball.svg" type="image/svg+xml" />
-        <link rel="alternate icon" href="/basketball.svg" />
+        <link rel="icon" href="/favicon.ico" type="image/x-icon" />
         <meta name="theme-color" content="#000000" />
       </Head>
       <Component {...pageProps} />

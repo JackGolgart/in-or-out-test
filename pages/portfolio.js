@@ -3,26 +3,49 @@ import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { getSupabaseClient } from '../lib/supabaseClient';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const supabase = getSupabaseClient();
 
 export default function Portfolio() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [predictions, setPredictions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'chart'
 
   useEffect(() => {
-    if (user) {
+    if (user && session) {
       fetchPredictions();
     }
-  }, [user]);
+  }, [user, session]);
 
   const fetchPredictions = async () => {
     try {
       const response = await fetch('/api/predictions', {
         headers: {
-          'Authorization': `Bearer ${user.access_token}`
+          'Authorization': `Bearer ${session.access_token}`
         }
       });
       
@@ -60,6 +83,127 @@ export default function Portfolio() {
     
     const netRatingChange = prediction.current_net_rating - prediction.net_rating_at_prediction;
     return prediction.prediction_type === 'in' ? netRatingChange : -netRatingChange;
+  };
+
+  const prepareChartData = () => {
+    const sortedPredictions = [...predictions].sort((a, b) => 
+      new Date(a.created_at) - new Date(b.created_at)
+    );
+
+    const labels = sortedPredictions.map(p => p.player_name);
+    const performances = sortedPredictions.map(p => calculatePerformance(p));
+    const colors = sortedPredictions.map(p => 
+      p.prediction_type === 'in' ? 'rgba(34, 197, 94, 0.8)' : 'rgba(239, 68, 68, 0.8)'
+    );
+
+    // Calculate cumulative performance
+    const cumulativePerformance = performances.reduce((acc, curr, index) => {
+      acc.push((acc[index - 1] || 0) + curr);
+      return acc;
+    }, []);
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Individual Predictions',
+          data: performances,
+          backgroundColor: colors,
+          borderColor: colors,
+          borderWidth: 2,
+          pointRadius: 6,
+          pointHoverRadius: 8,
+          type: 'scatter'
+        },
+        {
+          label: 'Total Portfolio',
+          data: cumulativePerformance,
+          borderColor: 'rgba(59, 130, 246, 0.8)',
+          backgroundColor: 'rgba(59, 130, 246, 0.2)',
+          borderWidth: 3,
+          pointRadius: 0,
+          fill: true,
+          tension: 0.4,
+          type: 'line'
+        }
+      ]
+    };
+  };
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top',
+        labels: {
+          color: 'white',
+          usePointStyle: true,
+          pointStyle: 'circle'
+        }
+      },
+      title: {
+        display: true,
+        text: 'Prediction Performance',
+        color: 'white',
+        font: {
+          size: 16
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            const datasetLabel = context.dataset.label;
+            const value = context.raw;
+            
+            if (datasetLabel === 'Total Portfolio') {
+              return `Total Portfolio: ${value > 0 ? '+' : ''}${value.toFixed(1)}`;
+            }
+
+            const prediction = predictions[context.dataIndex];
+            return [
+              `${prediction.player_name}`,
+              `Type: ${prediction.prediction_type.toUpperCase()}`,
+              `Performance: ${value > 0 ? '+' : ''}${value.toFixed(1)}`,
+              `Current Net Rating: ${prediction.current_net_rating?.toFixed(1) || 'N/A'}`,
+              `Prediction Net Rating: ${prediction.net_rating_at_prediction?.toFixed(1) || 'N/A'}`
+            ];
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)'
+        },
+        ticks: {
+          color: 'white',
+          callback: function(value) {
+            return value > 0 ? '+' + value.toFixed(1) : value.toFixed(1);
+          }
+        },
+        title: {
+          display: true,
+          text: 'Performance',
+          color: 'white'
+        }
+      },
+      x: {
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)'
+        },
+        ticks: {
+          color: 'white',
+          maxRotation: 45,
+          minRotation: 45
+        }
+      }
+    },
+    interaction: {
+      mode: 'index',
+      intersect: false
+    }
   };
 
   if (!user) {
@@ -111,13 +255,31 @@ export default function Portfolio() {
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <h1 className="text-3xl font-bold text-white mb-8">Your Portfolio</h1>
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold text-white">Your Portfolio</h1>
+            <div className="flex items-center space-x-2">
+              <span className="text-white">Cards</span>
+              <button
+                onClick={() => setViewMode(viewMode === 'cards' ? 'chart' : 'cards')}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                  viewMode === 'chart' ? 'bg-purple-600' : 'bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    viewMode === 'chart' ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className="text-white">Chart</span>
+            </div>
+          </div>
           
           {predictions.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-400">You haven't made any predictions yet.</p>
             </div>
-          ) : (
+          ) : viewMode === 'cards' ? (
             <div className="grid gap-6">
               {predictions.map((prediction) => {
                 const performance = calculatePerformance(prediction);
@@ -169,6 +331,15 @@ export default function Portfolio() {
                   </div>
                 );
               })}
+            </div>
+          ) : (
+            <div className="bg-gray-800 rounded-lg p-6">
+              <div className="mb-4">
+                <h2 className="text-xl font-semibold text-white">
+                  Total Portfolio Performance: {predictions.reduce((sum, p) => sum + calculatePerformance(p), 0).toFixed(1)}
+                </h2>
+              </div>
+              <Line data={prepareChartData()} options={chartOptions} />
             </div>
           )}
         </div>
