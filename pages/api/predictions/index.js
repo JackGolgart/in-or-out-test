@@ -1,4 +1,4 @@
-import { getSupabaseAdminClient } from '../../../lib/supabaseClient';
+import { supabase } from '../../../lib/supabase';
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -35,9 +35,6 @@ export default async function handler(req, res) {
       console.error('No token provided in authorization header');
       return res.status(401).json({ error: 'No token provided in authorization header' });
     }
-
-    // Get Supabase client
-    const supabase = getSupabaseAdminClient();
 
     // Verify token and get user
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
