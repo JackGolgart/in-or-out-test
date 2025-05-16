@@ -581,15 +581,53 @@ export async function getServerSideProps({ params, req }) {
       };
     }
 
-    // Get recent games from the player data
-    const recentGames = playerData.player.recent_games || [];
+    // Get recent games from the player data and ensure they're serializable
+    const recentGames = (playerData.player.recent_games || []).map(game => ({
+      date: game.date || null,
+      isPlayoff: game.isPlayoff || false,
+      gameType: game.gameType || 'Regular Season',
+      result: game.result || 'N/A',
+      score: game.score || '0-0',
+      points: game.points || 0,
+      rebounds: game.rebounds || 0,
+      assists: game.assists || 0,
+      minutes: game.minutes || '0'
+    }));
+
+    // Ensure all stats are serializable
+    const stats = {
+      points: playerData.player.regular_averages?.points || 0,
+      rebounds: playerData.player.regular_averages?.rebounds || 0,
+      assists: playerData.player.regular_averages?.assists || 0,
+      games_played: playerData.player.regular_averages?.games_played || 0
+    };
+
+    // Ensure player data is serializable
+    const player = {
+      ...playerData.player,
+      regular_net_rating: playerData.player.regular_net_rating || 0,
+      playoff_net_rating: playerData.player.playoff_net_rating || 0,
+      regular_averages: {
+        points: playerData.player.regular_averages?.points || 0,
+        rebounds: playerData.player.regular_averages?.rebounds || 0,
+        assists: playerData.player.regular_averages?.assists || 0,
+        games_played: playerData.player.regular_averages?.games_played || 0
+      },
+      playoff_averages: {
+        points: playerData.player.playoff_averages?.points || 0,
+        rebounds: playerData.player.playoff_averages?.rebounds || 0,
+        assists: playerData.player.playoff_averages?.assists || 0,
+        games_played: playerData.player.playoff_averages?.games_played || 0
+      },
+      recent_games: recentGames
+    };
 
     return {
       props: {
-        player: playerData.player,
-        stats: playerData.player.season_averages,
+        player,
+        stats,
         gameStats: recentGames,
-        playerHistory: history,
+        playerHistory: history || [],
         error: null
       }
     };
