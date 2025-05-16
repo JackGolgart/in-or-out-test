@@ -319,10 +319,10 @@ export default async function handler(req, res) {
     const response = {
       player: {
         ...player,
-        regular_net_rating: regularNetRating || 0,
-        playoff_net_rating: playoffNetRating || 0,
-        regular_averages: regularAverages,
-        playoff_averages: playoffAverages,
+        regular_net_rating: regularNetRating ?? 0,
+        playoff_net_rating: playoffNetRating ?? 0,
+        regular_averages: regularAverages ?? { points: 0, rebounds: 0, assists: 0, games_played: 0 },
+        playoff_averages: playoffAverages ?? { points: 0, rebounds: 0, assists: 0, games_played: 0 },
         recent_games: recentGames.map(game => ({
           date: game.game.date,
           isPlayoff: game.game.postseason,
@@ -332,8 +332,8 @@ export default async function handler(req, res) {
           points: game.pts || 0,
           rebounds: game.reb || 0,
           assists: game.ast || 0,
-          minutes: game.min
-        }))
+          minutes: game.min || '0'
+        })) || []
       }
     };
 
@@ -342,7 +342,9 @@ export default async function handler(req, res) {
       hasNetRating: !!response.player.regular_net_rating,
       regularNetRating: response.player.regular_net_rating,
       playoffNetRating: response.player.playoff_net_rating,
-      recentGamesCount: response.player.recent_games.length
+      recentGamesCount: response.player.recent_games.length,
+      hasRegularAverages: !!response.player.regular_averages,
+      hasPlayoffAverages: !!response.player.playoff_averages
     });
 
     return res.status(200).json(response);

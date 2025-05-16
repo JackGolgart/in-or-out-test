@@ -46,10 +46,20 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
         playoffNetRating: player.playoff_net_rating,
         hasRegularNetRating: player.regular_net_rating !== undefined && player.regular_net_rating !== null,
         hasPlayoffNetRating: player.playoff_net_rating !== undefined && player.playoff_net_rating !== null,
-        allPlayerKeys: Object.keys(player),
-        fullPlayerData: JSON.stringify(player, null, 2)
+        allPlayerKeys: Object.keys(player)
       });
-      setPlayerData(player);
+      
+      // Initialize player data with default values if needed
+      const initializedPlayer = {
+        ...player,
+        regular_net_rating: player.regular_net_rating ?? 0,
+        playoff_net_rating: player.playoff_net_rating ?? 0,
+        regular_averages: player.regular_averages ?? { points: 0, rebounds: 0, assists: 0, games_played: 0 },
+        playoff_averages: player.playoff_averages ?? { points: 0, rebounds: 0, assists: 0, games_played: 0 },
+        recent_games: player.recent_games ?? []
+      };
+      
+      setPlayerData(initializedPlayer);
       setShowPlayoffs(false); // Default to regular season
     }
   }, [player]);
@@ -60,6 +70,7 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
       console.log('No player data available for net rating calculation');
       return 0;
     }
+    
     const rating = showPlayoffs ? playerData.playoff_net_rating : playerData.regular_net_rating;
     console.log('Net rating calculation:', {
       showPlayoffs,
@@ -68,23 +79,26 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
       selectedRating: rating,
       playerDataKeys: Object.keys(playerData)
     });
-    return rating || 0;
+    
+    return rating ?? 0;
   }, [playerData, showPlayoffs]);
 
   // Debug log for currentNetRating and playerData
   useEffect(() => {
-    console.log('DEBUG: currentNetRating value:', {
-      value: currentNetRating,
-      type: typeof currentNetRating,
-      isNull: currentNetRating === null,
-      isUndefined: currentNetRating === undefined,
-      playerData: {
-        regularNetRating: playerData?.regular_net_rating,
-        playoffNetRating: playerData?.playoff_net_rating,
-        showPlayoffs,
-        allKeys: playerData ? Object.keys(playerData) : []
-      }
-    });
+    if (playerData) {
+      console.log('DEBUG: currentNetRating value:', {
+        value: currentNetRating,
+        type: typeof currentNetRating,
+        isNull: currentNetRating === null,
+        isUndefined: currentNetRating === undefined,
+        playerData: {
+          regularNetRating: playerData.regular_net_rating,
+          playoffNetRating: playerData.playoff_net_rating,
+          showPlayoffs,
+          allKeys: Object.keys(playerData)
+        }
+      });
+    }
   }, [currentNetRating, playerData, showPlayoffs]);
 
   // Update averages based on showPlayoffs state
