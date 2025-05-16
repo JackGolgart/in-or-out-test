@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="32" cy="32" r="28" fill="#4C1D95" fill-opacity="0.2"/>
+  
+  <!-- Fire -->
+  <path d="M32 12C32 12 36 20 36 28C36 36 28 40 28 40C28 40 36 44 36 52C36 52 44 44 44 36C44 28 32 12 32 12Z" fill="#F43F5E"/>
+  
+  <!-- Sparkles -->
+  <path d="M20 24L22 20L24 24L20 26L24 28L22 32L20 28L16 26L20 24Z" fill="#FCD34D"/>
+  <path d="M44 24L46 20L48 24L44 26L48 28L46 32L44 28L40 26L44 24Z" fill="#FCD34D"/>
+</svg> 

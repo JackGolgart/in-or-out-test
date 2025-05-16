@@ -175,11 +175,20 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
 
     setIsSubmitting(true);
     try {
-      console.log('Saving prediction with session:', session?.user?.id);
-      console.log('Prediction data:', {
+      const predictionData = {
         player_id: player.id,
         prediction_type: type,
-        net_rating: currentNetRating
+        net_rating: currentNetRating,
+        player_name: `${player.first_name} ${player.last_name}`
+      };
+
+      console.log('Saving prediction with data:', {
+        ...predictionData,
+        user_id: user.id,
+        session_id: session?.user?.id,
+        player_id_type: typeof player.id,
+        net_rating_type: typeof currentNetRating,
+        auth_token: session?.access_token ? 'present' : 'missing'
       });
 
       const response = await fetch('/api/predictions', {
@@ -188,11 +197,7 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({
-          player_id: player.id,
-          prediction_type: type,
-          net_rating: currentNetRating
-        })
+        body: JSON.stringify(predictionData)
       });
 
       if (response.status === 401) {
@@ -203,7 +208,12 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Prediction API error:', errorData);
+        console.error('Prediction API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+          requestData: predictionData
+        });
         throw new Error(errorData.error || 'Failed to save prediction');
       }
 
@@ -211,7 +221,13 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
       console.log('Prediction saved successfully:', data);
       setPrediction(data);
     } catch (error) {
-      console.error('Error saving prediction:', error);
+      console.error('Error saving prediction:', {
+        error: error.message,
+        stack: error.stack,
+        player: player?.id,
+        type: type,
+        netRating: currentNetRating
+      });
       setErrorMessage(error.message);
     } finally {
       setIsSubmitting(false);

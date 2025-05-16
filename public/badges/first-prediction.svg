@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="32" cy="32" r="28" fill="#4C1D95" fill-opacity="0.2"/>
+  
+  <!-- Footsteps -->
+  <path d="M24 24C24 24 28 20 32 20C36 20 40 24 40 24" stroke="#A855F7" stroke-width="3" stroke-linecap="round"/>
+  <path d="M20 32C20 32 24 28 28 28C32 28 36 32 36 32" stroke="#A855F7" stroke-width="3" stroke-linecap="round"/>
+  
+  <!-- Star -->
+  <path d="M32 12L35.5 22H46L37.5 28L41 38L32 32L23 38L26.5 28L18 22H28.5L32 12Z" fill="#A855F7"/>
+</svg> 

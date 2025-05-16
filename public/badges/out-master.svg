@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="32" cy="32" r="28" fill="#4C1D95" fill-opacity="0.2"/>
+  
+  <!-- Down Arrow -->
+  <path d="M32 48L20 32H28V16H36V32H44L32 48Z" fill="#EF4444"/>
+  
+  <!-- Crown -->
+  <path d="M24 24L28 20L32 24L36 20L40 24L36 28L32 24L28 28L24 24Z" fill="#FCD34D"/>
+</svg> 
