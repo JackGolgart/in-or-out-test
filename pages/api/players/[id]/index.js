@@ -92,6 +92,7 @@ export default async function handler(req, res) {
     let netRating = null;
     let regularNetRating = null;
     let playoffNetRating = null;
+    let advancedStats = null;
     try {
       console.log('Starting advanced stats fetch:', {
         playerId: id,
@@ -99,7 +100,7 @@ export default async function handler(req, res) {
         hasApiKey: !!apiKey
       });
 
-      const advancedStats = await getAdvancedStats(parseInt(id), currentSeason);
+      advancedStats = await getAdvancedStats(parseInt(id), currentSeason);
       console.log('Advanced stats response:', {
         hasData: !!advancedStats?.data,
         dataLength: advancedStats?.data?.length,
@@ -341,6 +342,27 @@ export default async function handler(req, res) {
             ? (homeScore > visitorScore ? 'W' : 'L')
             : (visitorScore > homeScore ? 'W' : 'L');
 
+          // Find the corresponding advanced stats for this game
+          const gameAdvancedStats = advancedStats?.data?.find(stat => {
+            // Match by game date and player ID
+            const statDate = new Date(stat.game?.date);
+            const gameDate = new Date(game.game.date);
+            // Compare dates by year, month, and day only
+            return statDate.getFullYear() === gameDate.getFullYear() &&
+                   statDate.getMonth() === gameDate.getMonth() &&
+                   statDate.getDate() === gameDate.getDate() &&
+                   stat.player_id === parseInt(id);
+          });
+
+          console.log('Matching advanced stats:', {
+            gameDate: game.game.date,
+            statDate: gameAdvancedStats?.game?.date,
+            playerId: id,
+            statPlayerId: gameAdvancedStats?.player_id,
+            netRating: gameAdvancedStats?.net_rating,
+            matched: !!gameAdvancedStats
+          });
+
           return {
             date: game.game.date,
             isPlayoff: game.game.postseason,
@@ -350,7 +372,8 @@ export default async function handler(req, res) {
             points: game.pts || 0,
             rebounds: game.reb || 0,
             assists: game.ast || 0,
-            minutes: game.min || '0'
+            minutes: game.min || '0',
+            net_rating: gameAdvancedStats?.net_rating ?? 0
           };
         }) || []
       }

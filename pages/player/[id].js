@@ -35,6 +35,8 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
   const [history, setHistory] = useState(playerHistory);
   const [prediction, setPrediction] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const gamesPerPage = 15;
 
   // Update state when props change
   useEffect(() => {
@@ -107,11 +109,25 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
     return showPlayoffs ? playerData.playoff_averages : playerData.regular_averages;
   }, [playerData, showPlayoffs]);
 
-  // Filter recent games based on showPlayoffs state
+  // Filter recent games based on showPlayoffs state and pagination
   const filteredRecentGames = useMemo(() => {
     if (!playerData?.recent_games) return [];
-    return playerData.recent_games.filter(game => game.isPlayoff === showPlayoffs);
+    const filtered = playerData.recent_games.filter(game => game.isPlayoff === showPlayoffs);
+    const startIndex = (currentPage - 1) * gamesPerPage;
+    return filtered.slice(startIndex, startIndex + gamesPerPage);
+  }, [playerData?.recent_games, showPlayoffs, currentPage]);
+
+  // Calculate total pages
+  const totalPages = useMemo(() => {
+    if (!playerData?.recent_games) return 1;
+    const filtered = playerData.recent_games.filter(game => game.isPlayoff === showPlayoffs);
+    return Math.ceil(filtered.length / gamesPerPage);
   }, [playerData?.recent_games, showPlayoffs]);
+
+  // Handle page change
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+  };
 
   // Fetch prediction only when user or player ID changes
   useEffect(() => {
@@ -481,40 +497,78 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
               </div>
             </div>
             {filteredRecentGames.length > 0 ? (
-              <div className="space-y-4">
-                {filteredRecentGames.map((game, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <div className="text-gray-400 text-sm">{formatDate(game.date)}</div>
-                        <span className={`px-2 py-0.5 text-xs rounded-full ${
-                          game.isPlayoff 
-                            ? 'bg-purple-600 text-white' 
-                            : 'bg-gray-600 text-gray-300'
-                        }`}>
-                          {game.gameType}
-                        </span>
+              <>
+                <div className="space-y-4">
+                  {filteredRecentGames.map((game, index) => (
+                    <div key={index} className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <div className="text-gray-400 text-sm">{formatDate(game.date)}</div>
+                          <span className={`px-2 py-0.5 text-xs rounded-full ${
+                            game.isPlayoff 
+                              ? 'bg-purple-600 text-white' 
+                              : 'bg-gray-600 text-gray-300'
+                          }`}>
+                            {game.gameType}
+                          </span>
+                        </div>
+                        <div className="text-white font-medium">{game.result}</div>
+                        <div className="text-gray-400 text-sm">{game.score}</div>
                       </div>
-                      <div className="text-white font-medium">{game.result}</div>
-                      <div className="text-gray-400 text-sm">{game.score}</div>
+                      <div className="flex space-x-6">
+                        <div className="text-center">
+                          <span className="text-white font-medium block">{game.points}</span>
+                          <span className="text-gray-400 text-sm">PTS</span>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-white font-medium block">{game.rebounds}</span>
+                          <span className="text-gray-400 text-sm">REB</span>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-white font-medium block">{game.assists}</span>
+                          <span className="text-gray-400 text-sm">AST</span>
+                        </div>
+                        <div className="text-center">
+                          <span className={`text-white font-medium block ${(game.net_rating ?? 0) > 0 ? 'text-green-400' : (game.net_rating ?? 0) < 0 ? 'text-red-400' : ''}`}>
+                            {(game.net_rating ?? 0) > 0 ? '+' : ''}{(game.net_rating ?? 0).toFixed(1)}
+                          </span>
+                          <span className="text-gray-400 text-sm">NET</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex space-x-6">
-                      <div className="text-center">
-                        <span className="text-white font-medium block">{game.points}</span>
-                        <span className="text-gray-400 text-sm">PTS</span>
-                      </div>
-                      <div className="text-center">
-                        <span className="text-white font-medium block">{game.rebounds}</span>
-                        <span className="text-gray-400 text-sm">REB</span>
-                      </div>
-                      <div className="text-center">
-                        <span className="text-white font-medium block">{game.assists}</span>
-                        <span className="text-gray-400 text-sm">AST</span>
-                      </div>
-                    </div>
+                  ))}
+                </div>
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex justify-center mt-6 space-x-2">
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className={`px-3 py-1 rounded ${
+                        currentPage === 1
+                          ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                          : 'bg-gray-700 text-white hover:bg-gray-600'
+                      }`}
+                    >
+                      Previous
+                    </button>
+                    <span className="px-3 py-1 text-gray-300">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className={`px-3 py-1 rounded ${
+                        currentPage === totalPages
+                          ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                          : 'bg-gray-700 text-white hover:bg-gray-600'
+                      }`}
+                    >
+                      Next
+                    </button>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             ) : (
               <p className="text-gray-400 text-center py-8">
                 No {showPlayoffs ? 'playoff' : 'regular season'} games available
