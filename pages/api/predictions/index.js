@@ -73,6 +73,7 @@ export default async function handler(req, res) {
 
       if (missingFields.length > 0) {
         console.error('Missing required fields:', missingFields);
+        console.error('Received data:', req.body);
         return res.status(400).json({ 
           error: 'Missing required fields',
           details: {
@@ -95,7 +96,8 @@ export default async function handler(req, res) {
       }
 
       // Validate net_rating is a number
-      if (typeof net_rating !== 'number' || isNaN(net_rating)) {
+      const netRatingNum = Number(net_rating);
+      if (isNaN(netRatingNum)) {
         console.error('Invalid net_rating:', net_rating);
         return res.status(400).json({ 
           error: 'Invalid net_rating',

@@ -100,7 +100,7 @@ export default function PlayerCard({ player, onClick }) {
         body: JSON.stringify({
           player_id: player.id,
           prediction_type: 'in',
-          net_rating: player.net_rating,
+          net_rating: player.net_rating || 0,
           player_name: `${player.first_name} ${player.last_name}`
         })
       });
