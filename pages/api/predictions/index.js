@@ -47,7 +47,7 @@ export default async function handler(req, res) {
     // Handle GET request
     if (req.method === 'GET') {
       const { data: predictions, error: fetchError } = await supabase
-        .from('predictions')
+        .from('user_picks')
         .select('*')
         .eq('user_id', user.id);
 
@@ -62,12 +62,13 @@ export default async function handler(req, res) {
     // Handle POST request
     if (req.method === 'POST') {
       console.log('Received prediction request:', req.body);
-      const { player_id, prediction_type, net_rating } = req.body;
+      const { player_id, prediction_type, net_rating, player_name } = req.body;
 
       // Validate required fields
       const missingFields = [];
       if (!player_id) missingFields.push('player_id');
       if (!prediction_type) missingFields.push('prediction_type');
+      if (!player_name) missingFields.push('player_name');
       if (net_rating === undefined || net_rating === null) missingFields.push('net_rating');
 
       if (missingFields.length > 0) {
@@ -82,7 +83,7 @@ export default async function handler(req, res) {
       }
 
       // Validate prediction type
-      if (!['in', 'out'].includes(prediction_type)) {
+      if (!['in', 'out'].includes(prediction_type.toLowerCase())) {
         console.error('Invalid prediction type:', prediction_type);
         return res.status(400).json({ 
           error: 'Invalid prediction type',
@@ -107,7 +108,7 @@ export default async function handler(req, res) {
 
       // Check if prediction already exists
       const { data: existingPrediction, error: fetchError } = await supabase
-        .from('predictions')
+        .from('user_picks')
         .select('*')
         .eq('user_id', user.id)
         .eq('player_id', player_id)
@@ -123,11 +124,11 @@ export default async function handler(req, res) {
         // Update existing prediction
         console.log('Updating existing prediction:', existingPrediction.id);
         const { data, error: updateError } = await supabase
-          .from('predictions')
+          .from('user_picks')
           .update({
-            prediction_type,
-            net_rating_at_prediction: net_rating,
-            updated_at: new Date().toISOString()
+            selection: prediction_type.toLowerCase(),
+            locked_in_per: net_rating,
+            player_name: player_name
           })
           .eq('id', existingPrediction.id)
           .select()
@@ -142,12 +143,13 @@ export default async function handler(req, res) {
         // Create new prediction
         console.log('Creating new prediction');
         const { data, error: insertError } = await supabase
-          .from('predictions')
+          .from('user_picks')
           .insert({
             user_id: user.id,
             player_id,
-            prediction_type,
-            net_rating_at_prediction: net_rating
+            player_name,
+            selection: prediction_type.toLowerCase(),
+            locked_in_per: net_rating
           })
           .select()
           .single();

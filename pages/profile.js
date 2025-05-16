@@ -13,8 +13,8 @@ export default function Profile() {
   // Update summary whenever picks change
   useEffect(() => {
     setSummary({
-      in: picks.filter(p => p.prediction_type === 'in').length,
-      out: picks.filter(p => p.prediction_type === 'out').length,
+      in: picks.filter(p => p.selection === 'in').length,
+      out: picks.filter(p => p.selection === 'out').length,
     });
   }, [picks]);
 
@@ -26,7 +26,7 @@ export default function Profile() {
         if (!user) return;
 
         const { data: profile, error: profileError } = await supabase
-          .from('profiles')
+          .from('users')
           .select('*')
           .eq('id', user.id)
           .single();
@@ -36,12 +36,10 @@ export default function Profile() {
           // If profile doesn't exist, create it
           if (profileError.code === 'PGRST116') {
             const { data: newProfile, error: createError } = await supabase
-              .from('profiles')
+              .from('users')
               .insert([{
                 id: user.id,
-                username: user.email?.split('@')[0] || '',
-                full_name: user.user_metadata?.full_name || '',
-                avatar_url: user.user_metadata?.avatar_url || ''
+                display_name: user.email?.split('@')[0] || ''
               }])
               .select()
               .single();
@@ -51,18 +49,18 @@ export default function Profile() {
               throw createError;
             }
 
-            if (newProfile?.username) {
-              setUsername(newProfile.username);
+            if (newProfile?.display_name) {
+              setUsername(newProfile.display_name);
             }
           } else {
             throw profileError;
           }
-        } else if (profile?.username) {
-          setUsername(profile.username);
+        } else if (profile?.display_name) {
+          setUsername(profile.display_name);
         }
 
         const { data: picksData, error: picksError } = await supabase
-          .from('predictions')
+          .from('user_picks')
           .select('*')
           .eq('user_id', user.id);
 
@@ -103,8 +101,8 @@ export default function Profile() {
       }
 
       const { data, error: updateError } = await supabase
-        .from('profiles')
-        .update({ username: username.trim() })
+        .from('users')
+        .update({ display_name: username.trim() })
         .eq('id', user.id)
         .select()
         .single();
@@ -115,7 +113,7 @@ export default function Profile() {
       }
 
       if (data) {
-        setUsername(data.username);
+        setUsername(data.display_name);
         setEditing(false);
       }
     } catch (error) {
