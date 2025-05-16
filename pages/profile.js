@@ -33,15 +33,32 @@ export default function Profile() {
         
         if (profileError) {
           console.error('Profile error:', profileError);
-          throw profileError;
-        }
-        
-        // Set username if it exists in profile
-        if (profile?.username) {
+          // If profile doesn't exist, create it
+          if (profileError.code === 'PGRST116') {
+            const { data: newProfile, error: createError } = await supabase
+              .from('profiles')
+              .insert([{
+                id: user.id,
+                username: user.email?.split('@')[0] || '',
+                full_name: user.user_metadata?.full_name || '',
+                avatar_url: user.user_metadata?.avatar_url || ''
+              }])
+              .select()
+              .single();
+
+            if (createError) {
+              console.error('Profile creation error:', createError);
+              throw createError;
+            }
+
+            if (newProfile?.username) {
+              setUsername(newProfile.username);
+            }
+          } else {
+            throw profileError;
+          }
+        } else if (profile?.username) {
           setUsername(profile.username);
-        } else {
-          // If no username exists, set it to empty string
-          setUsername('');
         }
 
         const { data: picksData, error: picksError } = await supabase
