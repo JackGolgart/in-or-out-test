@@ -58,7 +58,7 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
   const currentNetRating = useMemo(() => {
     if (!playerData) {
       console.log('No player data available for net rating calculation');
-      return null;
+      return 0;
     }
     const rating = showPlayoffs ? playerData.playoff_net_rating : playerData.regular_net_rating;
     console.log('Net rating calculation:', {
@@ -66,10 +66,9 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
       regularNetRating: playerData.regular_net_rating,
       playoffNetRating: playerData.playoff_net_rating,
       selectedRating: rating,
-      playerDataKeys: Object.keys(playerData),
-      fullPlayerData: JSON.stringify(playerData, null, 2)
+      playerDataKeys: Object.keys(playerData)
     });
-    return rating;
+    return rating || 0;
   }, [playerData, showPlayoffs]);
 
   // Debug log for currentNetRating and playerData

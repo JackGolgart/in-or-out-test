@@ -316,29 +316,36 @@ export default async function handler(req, res) {
     });
 
     // Prepare the response
-    const responseData = {
+    const response = {
       player: {
         ...player,
-        regular_net_rating: regularNetRating,
-        playoff_net_rating: playoffNetRating,
-        net_rating: netRating,
-        season_averages: seasonAverages,
+        regular_net_rating: regularNetRating || 0,
+        playoff_net_rating: playoffNetRating || 0,
         regular_averages: regularAverages,
         playoff_averages: playoffAverages,
-        recent_games: lastFiveGames,
-        is_in_playoffs: playoffGames.length > 0
+        recent_games: recentGames.map(game => ({
+          date: game.game.date,
+          isPlayoff: game.game.postseason,
+          gameType: game.game.postseason ? 'Playoff' : 'Regular Season',
+          result: game.team.score > game.opponent.score ? 'W' : 'L',
+          score: `${game.team.score}-${game.opponent.score}`,
+          points: game.pts || 0,
+          rebounds: game.reb || 0,
+          assists: game.ast || 0,
+          minutes: game.min
+        }))
       }
     };
 
-    console.log('Final response data:', {
+    console.log('Final response:', {
       playerId: id,
-      regularNetRating: responseData.player.regular_net_rating,
-      playoffNetRating: responseData.player.playoff_net_rating,
-      hasRegularNetRating: responseData.player.regular_net_rating !== null,
-      hasPlayoffNetRating: responseData.player.playoff_net_rating !== null
+      hasNetRating: !!response.player.regular_net_rating,
+      regularNetRating: response.player.regular_net_rating,
+      playoffNetRating: response.player.playoff_net_rating,
+      recentGamesCount: response.player.recent_games.length
     });
 
-    return res.status(200).json(responseData);
+    return res.status(200).json(response);
 
   } catch (error) {
     console.error('Error in player API:', {
