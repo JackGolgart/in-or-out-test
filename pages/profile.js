@@ -26,16 +26,26 @@ export default function Profile() {
         if (!user) return;
 
         const { data: profile, error: profileError } = await supabase
-          .from('users')
+          .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
         
-        if (profileError) throw profileError;
-        if (profile?.username) setUsername(profile.username);
+        if (profileError) {
+          console.error('Profile error:', profileError);
+          throw profileError;
+        }
+        
+        // Set username if it exists in profile
+        if (profile?.username) {
+          setUsername(profile.username);
+        } else {
+          // If no username exists, set it to empty string
+          setUsername('');
+        }
 
         const { data: picksData, error: picksError } = await supabase
-          .from('picks')
+          .from('predictions')
           .select('*')
           .eq('user_id', user.id);
 
@@ -64,19 +74,36 @@ export default function Profile() {
       setError('');
       const session = await supabase.auth.getSession();
       const user = session?.data?.session?.user;
-      if (!user) return;
+      if (!user) {
+        setError('No user session found');
+        return;
+      }
 
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ username })
-        .eq('id', user.id);
+      // Validate username
+      if (!username.trim()) {
+        setError('Username cannot be empty');
+        return;
+      }
 
-      if (updateError) throw updateError;
-      
-      setEditing(false);
+      const { data, error: updateError } = await supabase
+        .from('profiles')
+        .update({ username: username.trim() })
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw updateError;
+      }
+
+      if (data) {
+        setUsername(data.username);
+        setEditing(false);
+      }
     } catch (error) {
       console.error('Error saving username:', error);
-      setError('Failed to save username');
+      setError(error.message || 'Failed to save username');
     }
   };
 
