@@ -34,7 +34,7 @@ const LoadingSkeleton = () => (
 export default function PlayerCard({ player, onClick }) {
   const [renderStart] = useState(Date.now());
   const [isLoading, setIsLoading] = useState(true);
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [prediction, setPrediction] = useState(null);
   const router = useRouter();
 
@@ -46,8 +46,8 @@ export default function PlayerCard({ player, onClick }) {
 
   useEffect(() => {
     const fetchPrediction = async () => {
-      if (!user) {
-        console.log('No user found, skipping prediction fetch');
+      if (!user || !session) {
+        console.log('No user or session found, skipping prediction fetch');
         setIsLoading(false);
         return;
       }
@@ -55,7 +55,7 @@ export default function PlayerCard({ player, onClick }) {
       try {
         const response = await fetch('/api/predictions', {
           headers: {
-            'Authorization': `Bearer ${user.access_token}`
+            'Authorization': `Bearer ${session.access_token}`
           }
         });
 
@@ -80,11 +80,11 @@ export default function PlayerCard({ player, onClick }) {
       }
     };
     fetchPrediction();
-  }, [player.id, user]);
+  }, [player.id, user, session]);
 
   const handlePick = async () => {
-    if (!user) {
-      console.log('No user found, redirecting to login');
+    if (!user || !session) {
+      console.log('No user or session found, redirecting to login');
       router.push('/login');
       return;
     }
@@ -95,12 +95,13 @@ export default function PlayerCard({ player, onClick }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.access_token}`
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           player_id: player.id,
           prediction_type: 'in',
-          net_rating: player.net_rating
+          net_rating: player.net_rating,
+          player_name: `${player.first_name} ${player.last_name}`
         })
       });
 
