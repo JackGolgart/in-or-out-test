@@ -279,8 +279,18 @@ export default async function handler(req, res) {
           date: game.game.date,
           postseason: game.game.postseason,
           isPlayoff,
-          team: game.team?.full_name
+          team: game.team?.full_name,
+          homeScore: game.game.home_team_score,
+          visitorScore: game.game.visitor_team_score
         });
+        
+        // Safely determine the result and score
+        const homeScore = game.game.home_team_score ?? 0;
+        const visitorScore = game.game.visitor_team_score ?? 0;
+        const isHomeTeam = game.game.home_team_id === game.team.id;
+        const result = isHomeTeam 
+          ? (homeScore > visitorScore ? 'W' : 'L')
+          : (visitorScore > homeScore ? 'W' : 'L');
         
         return {
           date: game.game.date,
@@ -289,8 +299,8 @@ export default async function handler(req, res) {
           rebounds: game.reb || 0,
           assists: game.ast || 0,
           minutes: game.min || '0',
-          result: game.game.home_team_score > game.game.visitor_team_score ? 'W' : 'L',
-          score: `${game.game.home_team_score}-${game.game.visitor_team_score}`,
+          result,
+          score: `${homeScore}-${visitorScore}`,
           isPlayoff,
           gameType: isPlayoff ? 'Playoff' : 'Regular Season'
         };
@@ -323,17 +333,26 @@ export default async function handler(req, res) {
         playoff_net_rating: playoffNetRating ?? 0,
         regular_averages: regularAverages ?? { points: 0, rebounds: 0, assists: 0, games_played: 0 },
         playoff_averages: playoffAverages ?? { points: 0, rebounds: 0, assists: 0, games_played: 0 },
-        recent_games: recentGames.map(game => ({
-          date: game.game.date,
-          isPlayoff: game.game.postseason,
-          gameType: game.game.postseason ? 'Playoff' : 'Regular Season',
-          result: game.team.score > game.opponent.score ? 'W' : 'L',
-          score: `${game.team.score}-${game.opponent.score}`,
-          points: game.pts || 0,
-          rebounds: game.reb || 0,
-          assists: game.ast || 0,
-          minutes: game.min || '0'
-        })) || []
+        recent_games: recentGames.map(game => {
+          const homeScore = game.game.home_team_score ?? 0;
+          const visitorScore = game.game.visitor_team_score ?? 0;
+          const isHomeTeam = game.game.home_team_id === game.team.id;
+          const result = isHomeTeam 
+            ? (homeScore > visitorScore ? 'W' : 'L')
+            : (visitorScore > homeScore ? 'W' : 'L');
+
+          return {
+            date: game.game.date,
+            isPlayoff: game.game.postseason,
+            gameType: game.game.postseason ? 'Playoff' : 'Regular Season',
+            result,
+            score: `${homeScore}-${visitorScore}`,
+            points: game.pts || 0,
+            rebounds: game.reb || 0,
+            assists: game.ast || 0,
+            minutes: game.min || '0'
+          };
+        }) || []
       }
     };
 
