@@ -31,26 +31,29 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
   const [showPlayoffs, setShowPlayoffs] = useState(false);
   const [playerData, setPlayerData] = useState(player);
   const [seasonStats, setSeasonStats] = useState(stats);
-  const [recentGames, setRecentGames] = useState(gameStats);
+  const [recentGames, setRecentGames] = useState({ games: [], regular: 0, playoff: 0, total: 0 });
   const [history, setHistory] = useState(playerHistory);
   const [prediction, setPrediction] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const gamesPerPage = 15;
 
-  // Update state when props change
+  // Initialize player data
   useEffect(() => {
     if (player) {
-      console.log('Initial player data:', {
+      console.log('Initializing player data:', {
         id: player.id,
         name: `${player.first_name} ${player.last_name}`,
+        hasRecentGames: !!player.recent_games,
+        recentGamesCount: player.recent_games?.length,
+        hasRegularNetRatings: !!player.regularNetRatings,
+        regularNetRatingsCount: player.regularNetRatings?.length,
         regularNetRating: player.regular_net_rating,
         playoffNetRating: player.playoff_net_rating,
-        hasRegularNetRating: player.regular_net_rating !== undefined && player.regular_net_rating !== null,
-        hasPlayoffNetRating: player.playoff_net_rating !== undefined && player.playoff_net_rating !== null,
-        allPlayerKeys: Object.keys(player)
+        sampleGames: player.recent_games?.slice(0, 3),
+        sampleNetRatings: player.regularNetRatings?.slice(0, 3)
       });
-      
+
       // Initialize player data with default values if needed
       const initializedPlayer = {
         ...player,
@@ -58,11 +61,120 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
         playoff_net_rating: player.playoff_net_rating ?? 0,
         regular_averages: player.regular_averages ?? { points: 0, rebounds: 0, assists: 0, games_played: 0 },
         playoff_averages: player.playoff_averages ?? { points: 0, rebounds: 0, assists: 0, games_played: 0 },
-        recent_games: player.recent_games ?? []
+        regularNetRatings: player.regularNetRatings || [],
+        recent_games: player.recent_games || []
       };
-      
+
+      console.log('Player data before processing:', {
+        id: initializedPlayer.id,
+        name: `${initializedPlayer.first_name} ${initializedPlayer.last_name}`,
+        regularNetRatings: initializedPlayer.regularNetRatings?.map(r => ({
+          date: r.date,
+          net_rating: r.net_rating,
+          game_id: r.game_id
+        })),
+        recentGames: initializedPlayer.recent_games?.map(g => ({
+          date: g.date,
+          game_id: g.game_id,
+          isPlayoff: g.isPlayoff
+        }))
+      });
+
+      // Sort games by date (most recent first) and map NET ratings
+      const sortedGames = [...initializedPlayer.recent_games].sort((a, b) => 
+        new Date(b.date) - new Date(a.date)
+      );
+
+      // Map recent games to include NET ratings
+      const mappedRecentGames = sortedGames.map((game) => {
+        // Find matching NET rating by date
+        const matchingRating = initializedPlayer.regularNetRatings?.find(rating => {
+          try {
+            // Convert both dates to UTC for comparison
+            const ratingDate = new Date(rating.date);
+            const gameDate = new Date(game.date);
+            
+            // Validate dates
+            if (isNaN(ratingDate.getTime()) || isNaN(gameDate.getTime())) {
+              if (process.env.NODE_ENV === 'development') {
+                console.log('Invalid date:', { 
+                  ratingDate: rating.date, 
+                  gameDate: game.date,
+                  ratingDateObj: ratingDate,
+                  gameDateObj: gameDate
+                });
+              }
+              return false;
+            }
+            
+            // Compare dates by year, month, and day only
+            const isMatch = ratingDate.getUTCFullYear() === gameDate.getUTCFullYear() &&
+                          ratingDate.getUTCMonth() === gameDate.getUTCMonth() &&
+                          ratingDate.getUTCDate() === gameDate.getUTCDate();
+
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Date comparison:', {
+                gameDate: game.date,
+                ratingDate: rating.date,
+                gameYear: gameDate.getUTCFullYear(),
+                ratingYear: ratingDate.getUTCFullYear(),
+                gameMonth: gameDate.getUTCMonth(),
+                ratingMonth: ratingDate.getUTCMonth(),
+                gameDay: gameDate.getUTCDate(),
+                ratingDay: ratingDate.getUTCDate(),
+                isMatch
+              });
+            }
+            
+            return isMatch;
+          } catch (error) {
+            if (process.env.NODE_ENV === 'development') {
+              console.error('Error comparing dates:', error);
+            }
+            return false;
+          }
+        });
+
+        const netRating = matchingRating?.net_rating ?? 0;
+        console.log('Final NET rating for game:', {
+          gameDate: game.date,
+          netRating,
+          matchingRating,
+          availableRatings: initializedPlayer.regularNetRatings?.map(r => ({
+            date: r.date,
+            netRating: r.net_rating,
+            game_id: r.game_id
+          }))
+        });
+
+        return {
+          ...game,
+          net_rating: Number(netRating)
+        };
+      });
+
       setPlayerData(initializedPlayer);
-      setShowPlayoffs(false); // Default to regular season
+      setRecentGames({
+        games: mappedRecentGames,
+        regular: mappedRecentGames.filter(g => !g.isPlayoff).length,
+        playoff: mappedRecentGames.filter(g => g.isPlayoff).length,
+        total: mappedRecentGames.length
+      });
+
+      console.log('Initialized player data:', {
+        id: initializedPlayer.id,
+        name: `${initializedPlayer.first_name} ${initializedPlayer.last_name}`,
+        regularNetRating: initializedPlayer.regular_net_rating,
+        playoffNetRating: initializedPlayer.playoff_net_rating,
+        recentGamesCount: mappedRecentGames.length,
+        regularNetRatingsCount: initializedPlayer.regularNetRatings.length,
+        mappedGames: mappedRecentGames.slice(0, 3).map(g => ({
+          date: g.date,
+          gameId: g.game_id,
+          net_rating: g.net_rating,
+          isPlayoff: g.isPlayoff
+        }))
+      });
     }
   }, [player]);
 
@@ -111,18 +223,18 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
 
   // Filter recent games based on showPlayoffs state and pagination
   const filteredRecentGames = useMemo(() => {
-    if (!playerData?.recent_games) return [];
-    const filtered = playerData.recent_games.filter(game => game.isPlayoff === showPlayoffs);
+    const games = recentGames?.games || [];
+    const filtered = games.filter(game => game.isPlayoff === showPlayoffs);
     const startIndex = (currentPage - 1) * gamesPerPage;
     return filtered.slice(startIndex, startIndex + gamesPerPage);
-  }, [playerData?.recent_games, showPlayoffs, currentPage]);
+  }, [recentGames?.games, showPlayoffs, currentPage]);
 
   // Calculate total pages
   const totalPages = useMemo(() => {
-    if (!playerData?.recent_games) return 1;
-    const filtered = playerData.recent_games.filter(game => game.isPlayoff === showPlayoffs);
+    const games = recentGames?.games || [];
+    const filtered = games.filter(game => game.isPlayoff === showPlayoffs);
     return Math.ceil(filtered.length / gamesPerPage);
-  }, [playerData?.recent_games, showPlayoffs]);
+  }, [recentGames?.games, showPlayoffs]);
 
   // Handle page change
   const handlePageChange = (newPage) => {
@@ -272,14 +384,14 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
   // Debug log for recent games
   useEffect(() => {
     console.log('Recent games state:', {
-      total: recentGames.length,
-      regular: recentGames.filter(g => !g.isPlayoff).length,
-      playoff: recentGames.filter(g => g.isPlayoff).length,
-      games: recentGames.map(g => ({
+      total: recentGames?.total || 0,
+      regular: recentGames?.regular || 0,
+      playoff: recentGames?.playoff || 0,
+      games: recentGames?.games?.map(g => ({
         date: g.date,
         isPlayoff: g.isPlayoff,
         type: g.gameType
-      }))
+      })) || []
     });
   }, [recentGames]);
 
@@ -529,8 +641,8 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
                           <span className="text-gray-400 text-sm">AST</span>
                         </div>
                         <div className="text-center">
-                          <span className={`text-white font-medium block ${(game.net_rating ?? 0) > 0 ? 'text-green-400' : (game.net_rating ?? 0) < 0 ? 'text-red-400' : ''}`}>
-                            {(game.net_rating ?? 0) > 0 ? '+' : ''}{(game.net_rating ?? 0).toFixed(1)}
+                          <span className={`text-white font-medium block ${Number(game.net_rating) > 0 ? 'text-green-400' : Number(game.net_rating) < 0 ? 'text-red-400' : ''}`}>
+                            {Number(game.net_rating) > 0 ? '+' : ''}{Number(game.net_rating).toFixed(1)}
                           </span>
                           <span className="text-gray-400 text-sm">NET</span>
                         </div>
@@ -584,42 +696,65 @@ export default function PlayerPage({ player, stats, gameStats, playerHistory, er
 export async function getServerSideProps({ params, req }) {
   try {
     const { id } = params;
-    console.log('Fetching player data for ID:', id);
+    
+    // Validate player ID
+    const playerId = Number(id);
+    if (isNaN(playerId) || playerId <= 0 || playerId > 999999) {
+      return {
+        props: {
+          error: 'Invalid player ID',
+          player: null,
+          stats: null,
+          gameStats: [],
+          playerHistory: []
+        }
+      };
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Fetching player data for ID:', playerId);
+    }
     
     // Get the base URL for API calls
     const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
     const host = req.headers.host;
     const baseUrl = `${protocol}://${host}`;
     
-    console.log('Making API calls:', {
-      playerUrl: `${baseUrl}/api/players/${id}`,
-      historyUrl: `${baseUrl}/api/players/${id}/history`
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Making API calls:', {
+        playerUrl: `${baseUrl}/api/players/${playerId}`,
+        historyUrl: `${baseUrl}/api/players/${playerId}/history`
+      });
+    }
     
     // Fetch player data and history in parallel
     const [playerRes, historyRes] = await Promise.all([
-      fetch(`${baseUrl}/api/players/${id}`),
-      fetch(`${baseUrl}/api/players/${id}/history`)
+      fetch(`${baseUrl}/api/players/${playerId}`),
+      fetch(`${baseUrl}/api/players/${playerId}/history`)
     ]);
 
-    console.log('API responses:', {
-      playerStatus: playerRes.status,
-      playerOk: playerRes.ok,
-      historyStatus: historyRes.status,
-      historyOk: historyRes.ok
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('API responses:', {
+        playerStatus: playerRes.status,
+        playerOk: playerRes.ok,
+        historyStatus: historyRes.status,
+        historyOk: historyRes.ok
+      });
+    }
 
     if (!playerRes.ok) {
       const errorData = await playerRes.json();
-      console.error('Player API error:', {
-        status: playerRes.status,
-        error: errorData,
-        playerId: id,
-        url: `${baseUrl}/api/players/${id}`
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Player API error:', {
+          status: playerRes.status,
+          error: errorData,
+          playerId,
+          url: `${baseUrl}/api/players/${playerId}`
+        });
+      }
       return {
         props: {
-          error: errorData.error || 'Failed to load player data',
+          error: 'Failed to load player data',
           player: null,
           stats: null,
           gameStats: [],
@@ -631,15 +766,19 @@ export async function getServerSideProps({ params, req }) {
     const playerData = await playerRes.json();
     const history = historyRes.ok ? await historyRes.json() : [];
 
-    console.log('Player API response:', {
-      hasPlayer: !!playerData?.player,
-      hasStats: !!playerData?.player?.season_averages,
-      playerId: id,
-      team: playerData?.player?.team?.full_name
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Player API response:', {
+        hasPlayer: !!playerData?.player,
+        hasStats: !!playerData?.player?.season_averages,
+        playerId,
+        team: playerData?.player?.team?.full_name
+      });
+    }
 
     if (!playerData?.player) {
-      console.error('Player not found in response:', playerData);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Player not found in response:', playerData);
+      }
       return {
         props: {
           error: 'Player not found',
@@ -652,45 +791,128 @@ export async function getServerSideProps({ params, req }) {
     }
 
     // Get recent games from the player data and ensure they're serializable
-    const recentGames = (playerData.player.recent_games || []).map(game => ({
-      date: game.date || null,
-      isPlayoff: game.isPlayoff || false,
-      gameType: game.gameType || 'Regular Season',
-      result: game.result || 'N/A',
-      score: game.score || '0-0',
-      points: game.points || 0,
-      rebounds: game.rebounds || 0,
-      assists: game.assists || 0,
-      minutes: game.minutes || '0'
-    }));
+    const recentGames = (playerData.player.recent_games || []).map((game) => {
+      // Find matching NET rating by date
+      const matchingRating = playerData.player.regularNetRatings?.find(rating => {
+        try {
+          // Convert both dates to UTC for comparison
+          const ratingDate = new Date(rating.date);
+          const gameDate = new Date(game.date);
+          
+          // Validate dates
+          if (isNaN(ratingDate.getTime()) || isNaN(gameDate.getTime())) {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Invalid date:', { ratingDate: rating.date, gameDate: game.date });
+            }
+            return false;
+          }
+          
+          // Compare dates by year, month, and day only
+          return ratingDate.getUTCFullYear() === gameDate.getUTCFullYear() &&
+                 ratingDate.getUTCMonth() === gameDate.getUTCMonth() &&
+                 ratingDate.getUTCDate() === gameDate.getUTCDate();
+        } catch (error) {
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Error comparing dates:', error);
+          }
+          return false;
+        }
+      });
 
-    // Ensure all stats are serializable
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Processing game:', {
+          date: game.date,
+          netRating: matchingRating?.net_rating,
+          regularNetRatingsLength: playerData.player.regularNetRatings?.length,
+          availableRatings: playerData.player.regularNetRatings?.map(r => ({
+            date: r.date,
+            netRating: r.net_rating
+          }))
+        });
+      }
+
+      // Sanitize and validate game data
+      const sanitizedGame = {
+        date: game.date || null,
+        isPlayoff: Boolean(game.isPlayoff),
+        gameType: game.gameType || 'Regular Season',
+        result: game.result || 'N/A',
+        score: game.score || '0-0',
+        points: Number(game.points) || 0,
+        rebounds: Number(game.rebounds) || 0,
+        assists: Number(game.assists) || 0,
+        minutes: game.minutes || '0',
+        net_rating: Number(matchingRating?.net_rating) || 0
+      };
+
+      // Validate numeric values
+      if (isNaN(sanitizedGame.points) || isNaN(sanitizedGame.rebounds) || 
+          isNaN(sanitizedGame.assists) || isNaN(sanitizedGame.net_rating)) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Invalid numeric values in game:', game);
+        }
+        return {
+          ...sanitizedGame,
+          points: 0,
+          rebounds: 0,
+          assists: 0,
+          net_rating: 0
+        };
+      }
+
+      return sanitizedGame;
+    });
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Processed recent games:', {
+        totalGames: recentGames.length,
+        gamesWithNetRatings: recentGames.filter(g => g.net_rating !== 0).length
+      });
+    }
+
+    // Ensure all stats are serializable and validated
     const stats = {
-      points: playerData.player.regular_averages?.points || 0,
-      rebounds: playerData.player.regular_averages?.rebounds || 0,
-      assists: playerData.player.regular_averages?.assists || 0,
-      games_played: playerData.player.regular_averages?.games_played || 0
+      points: Number(playerData.player.regular_averages?.points) || 0,
+      rebounds: Number(playerData.player.regular_averages?.rebounds) || 0,
+      assists: Number(playerData.player.regular_averages?.assists) || 0,
+      games_played: Number(playerData.player.regular_averages?.games_played) || 0
     };
 
-    // Ensure player data is serializable
+    // Ensure player data is serializable and validated
     const player = {
       ...playerData.player,
-      regular_net_rating: playerData.player.regular_net_rating || 0,
-      playoff_net_rating: playerData.player.playoff_net_rating || 0,
+      regular_net_rating: Number(playerData.player.regular_net_rating) || 0,
+      playoff_net_rating: Number(playerData.player.playoff_net_rating) || 0,
       regular_averages: {
-        points: playerData.player.regular_averages?.points || 0,
-        rebounds: playerData.player.regular_averages?.rebounds || 0,
-        assists: playerData.player.regular_averages?.assists || 0,
-        games_played: playerData.player.regular_averages?.games_played || 0
+        points: Number(playerData.player.regular_averages?.points) || 0,
+        rebounds: Number(playerData.player.regular_averages?.rebounds) || 0,
+        assists: Number(playerData.player.regular_averages?.assists) || 0,
+        games_played: Number(playerData.player.regular_averages?.games_played) || 0
       },
       playoff_averages: {
-        points: playerData.player.playoff_averages?.points || 0,
-        rebounds: playerData.player.playoff_averages?.rebounds || 0,
-        assists: playerData.player.playoff_averages?.assists || 0,
-        games_played: playerData.player.playoff_averages?.games_played || 0
+        points: Number(playerData.player.playoff_averages?.points) || 0,
+        rebounds: Number(playerData.player.playoff_averages?.rebounds) || 0,
+        assists: Number(playerData.player.playoff_averages?.assists) || 0,
+        games_played: Number(playerData.player.playoff_averages?.games_played) || 0
       },
-      recent_games: recentGames
+      recent_games: recentGames,
+      regularNetRatings: (playerData.player.regularNetRatings || []).map(rating => ({
+        date: rating.date,
+        game_id: rating.game_id,
+        net_rating: Number(rating.net_rating) || 0
+      }))
     };
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Final player data:', {
+        id: player.id,
+        name: `${player.first_name} ${player.last_name}`,
+        regularNetRating: player.regular_net_rating,
+        playoffNetRating: player.playoff_net_rating,
+        recentGamesCount: player.recent_games.length,
+        regularNetRatingsCount: player.regularNetRatings.length
+      });
+    }
 
     return {
       props: {
@@ -702,11 +924,13 @@ export async function getServerSideProps({ params, req }) {
       }
     };
   } catch (error) {
-    console.error('Error in getServerSideProps:', {
-      message: error.message,
-      stack: error.stack,
-      playerId: params?.id
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error in getServerSideProps:', {
+        message: error.message,
+        stack: error.stack,
+        playerId: params?.id
+      });
+    }
     
     return {
       props: {

@@ -191,10 +191,11 @@ const handler = async (req, res) => {
         per_page: Math.min(100, Math.max(1, parseInt(per_page)))
       };
 
-      // If search query contains a space, try searching with just the first name
+      // Clean and format the search query
       if (cleanSearch.includes(' ')) {
-        const [firstName] = cleanSearch.split(' ');
-        searchParams.search = firstName;
+        const [firstName, lastName] = cleanSearch.split(' ');
+        // Try searching with just the last name first, as it's more unique
+        searchParams.search = lastName;
       } else {
         searchParams.search = cleanSearch;
       }
@@ -205,10 +206,16 @@ const handler = async (req, res) => {
       // If we have results, filter them client-side for the full name match
       if (response?.data?.length > 0 && cleanSearch.includes(' ')) {
         const [firstName, lastName] = cleanSearch.split(' ');
-        response.data = response.data.filter(player => 
-          player.first_name.toLowerCase() === firstName.toLowerCase() &&
-          player.last_name.toLowerCase() === lastName.toLowerCase()
-        );
+        response.data = response.data.filter(player => {
+          // For short first names (2-3 characters), use startsWith instead of exact match
+          const isShortFirstName = firstName.length <= 3;
+          const firstNameMatch = isShortFirstName 
+            ? player.first_name.toLowerCase().startsWith(firstName.toLowerCase())
+            : player.first_name.toLowerCase() === firstName.toLowerCase();
+          
+          return firstNameMatch && 
+                 player.last_name.toLowerCase() === lastName.toLowerCase();
+        });
       }
     } catch (error) {
       console.error('SDK Error:', {
@@ -398,7 +405,19 @@ const handler = async (req, res) => {
         const teamName = player.team?.full_name || '';
         const teamAbbr = player.team?.abbreviation || '';
         
-        // Try exact match first
+        // If search contains a space, handle first/last name separately
+        if (cleanSearch.includes(' ')) {
+          const [searchFirstName, searchLastName] = cleanSearch.split(' ');
+          const isShortFirstName = searchFirstName.length <= 3;
+          const firstNameMatch = isShortFirstName
+            ? player.first_name.toLowerCase().startsWith(searchFirstName.toLowerCase())
+            : player.first_name.toLowerCase() === searchFirstName.toLowerCase();
+          
+          return firstNameMatch && 
+                 player.last_name.toLowerCase() === searchLastName.toLowerCase();
+        }
+        
+        // For single word searches, try exact match first
         if (fullName === cleanSearch) return true;
         
         // Then try partial matches (case-insensitive)

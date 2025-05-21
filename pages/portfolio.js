@@ -12,8 +12,10 @@ import {
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 } from 'chart.js';
+import annotationPlugin from 'chartjs-plugin-annotation';
 
 // Register ChartJS components
 ChartJS.register(
@@ -23,7 +25,9 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler,
+  annotationPlugin
 );
 
 export default function Portfolio() {
@@ -88,86 +92,78 @@ export default function Portfolio() {
       new Date(a.created_at) - new Date(b.created_at)
     );
 
-    const labels = sortedPredictions.map(p => p.player_name);
-    const performances = sortedPredictions.map(p => calculatePerformance(p));
-    const colors = sortedPredictions.map(p => 
-      p.prediction_type === 'in' ? 'rgba(34, 197, 94, 0.8)' : 'rgba(239, 68, 68, 0.8)'
-    );
-
-    // Calculate cumulative performance
-    const cumulativePerformance = performances.reduce((acc, curr, index) => {
-      acc.push((acc[index - 1] || 0) + curr);
+    // Calculate cumulative performance over time
+    const cumulativePerformance = sortedPredictions.reduce((acc, prediction, index) => {
+      const performance = calculatePerformance(prediction);
+      acc.push((acc[index - 1] || 0) + performance);
       return acc;
     }, []);
 
+    // Find all-time high points
+    let max = Number.NEGATIVE_INFINITY;
+    const highPoints = cumulativePerformance.map((val, idx) => {
+      if (val >= max) {
+        max = val;
+        return idx;
+      }
+      return null;
+    }).filter(idx => idx !== null);
+
     return {
-      labels,
+      labels: sortedPredictions.map(p => new Date(p.created_at).toLocaleDateString()),
       datasets: [
         {
-          label: 'Individual Predictions',
-          data: performances,
-          backgroundColor: colors,
-          borderColor: colors,
-          borderWidth: 2,
-          pointRadius: 6,
-          pointHoverRadius: 8,
-          type: 'scatter'
-        },
-        {
-          label: 'Total Portfolio',
+          label: 'Portfolio Value',
           data: cumulativePerformance,
-          borderColor: 'rgba(59, 130, 246, 0.8)',
-          backgroundColor: 'rgba(59, 130, 246, 0.2)',
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37, 99, 235, 0.08)',
           borderWidth: 3,
-          pointRadius: 0,
+          pointRadius: cumulativePerformance.map((_, idx) => highPoints.includes(idx) ? 7 : 4),
+          pointBackgroundColor: cumulativePerformance.map((_, idx) => highPoints.includes(idx) ? '#facc15' : '#2563eb'),
+          pointBorderColor: cumulativePerformance.map((_, idx) => highPoints.includes(idx) ? '#facc15' : '#fff'),
+          pointHoverRadius: 9,
           fill: true,
           tension: 0.4,
           type: 'line'
         }
-      ]
+      ],
+      highPoints,
+      cumulativePerformance,
+      labelsRaw: sortedPredictions.map(p => p.created_at),
     };
   };
 
-  const chartOptions = {
+  const chartOptions = (chartData) => ({
     responsive: true,
     plugins: {
       legend: {
-        display: true,
-        position: 'top',
-        labels: {
-          color: 'white',
-          usePointStyle: true,
-          pointStyle: 'circle'
-        }
-      },
-      title: {
-        display: true,
-        text: 'Prediction Performance',
-        color: 'white',
-        font: {
-          size: 16
-        }
+        display: false
       },
       tooltip: {
         callbacks: {
           label: function(context) {
-            const datasetLabel = context.dataset.label;
             const value = context.raw;
-            
-            if (datasetLabel === 'Total Portfolio') {
-              return `Total Portfolio: ${value > 0 ? '+' : ''}${value.toFixed(1)}`;
-            }
-
-            const prediction = predictions[context.dataIndex];
-            return [
-              `${prediction.player_name}`,
-              `Type: ${prediction.prediction_type.toUpperCase()}`,
-              `Performance: ${value > 0 ? '+' : ''}${value.toFixed(1)}`,
-              `Current Net Rating: ${prediction.current_net_rating?.toFixed(1) || 'N/A'}`,
-              `Prediction Net Rating: ${prediction.net_rating_at_prediction?.toFixed(1) || 'N/A'}`
-            ];
+            return `Portfolio Value: ${value > 0 ? '+' : ''}${value.toFixed(1)}`;
           }
         }
+      },
+      annotation: {
+        annotations: chartData.highPoints.map(idx => ({
+          type: 'point',
+          xValue: chartData.labels[idx],
+          yValue: chartData.cumulativePerformance[idx],
+          backgroundColor: '#facc15',
+          radius: 8,
+          borderColor: '#facc15',
+          borderWidth: 2,
+          label: {
+            display: true,
+            content: 'ATH',
+            color: '#facc15',
+            font: { weight: 'bold' },
+            position: 'top'
+          }
+        }))
       }
     },
     scales: {
@@ -202,7 +198,7 @@ export default function Portfolio() {
       mode: 'index',
       intersect: false
     }
-  };
+  });
 
   if (!user) {
     return (
@@ -337,7 +333,12 @@ export default function Portfolio() {
                   Total Portfolio Performance: {predictions.reduce((sum, p) => sum + calculatePerformance(p), 0).toFixed(1)}
                 </h2>
               </div>
-              <Line data={prepareChartData()} options={chartOptions} />
+              {(() => {
+                const chartData = prepareChartData();
+                return (
+                  <Line data={chartData} options={chartOptions(chartData)} />
+                );
+              })()}
             </div>
           )}
         </div>

@@ -38,12 +38,18 @@ function calculateAverages(games) {
 }
 
 export default async function handler(req, res) {
-  // Set JSON content type for all responses
-  res.setHeader('Content-Type', 'application/json');
+  if (req.method !== 'GET') {
+    return res.status(405).json({ message: 'Method not allowed' });
+  }
 
   const { id } = req.query;
   const apiKey = process.env.BALLDONTLIE_API_KEY;
-  
+  let regularNetRatings = [];
+  let playoffNetRatings = [];
+  let regularNetRating = 0;
+  let playoffNetRating = 0;
+  let netRating = 0;
+
   console.log('API handler called:', {
     method: req.method,
     playerId: id,
@@ -53,8 +59,8 @@ export default async function handler(req, res) {
   });
 
   if (!apiKey) {
-    console.error('API key is missing');
-    return res.status(500).json({ error: 'API key is missing' });
+    console.error('BallDontLie API key is not configured');
+    return res.status(500).json({ message: 'API key not configured' });
   }
 
   try {
@@ -89,9 +95,6 @@ export default async function handler(req, res) {
     });
 
     // Fetch advanced stats for net rating
-    let netRating = null;
-    let regularNetRating = null;
-    let playoffNetRating = null;
     let advancedStats = null;
     try {
       console.log('Starting advanced stats fetch:', {
@@ -132,29 +135,76 @@ export default async function handler(req, res) {
         });
 
         // Calculate net ratings
-        const regularNetRatings = regularSeasonStats
-          .filter(stat => stat.net_rating !== null && stat.net_rating !== undefined)
-          .map(stat => stat.net_rating);
+        regularNetRatings = regularSeasonStats
+          .filter(stat => {
+            // Only check if net rating exists
+            console.log('Filtering regular season stat:', {
+              gameId: stat.game?.id,
+              date: stat.game?.date,
+              netRating: stat.net_rating,
+              rawStat: stat
+            });
+            return stat.net_rating !== null && 
+                   stat.net_rating !== undefined;
+          })
+          .map(stat => {
+            console.log('Mapping regular season stat:', {
+              gameId: stat.game?.id,
+              date: stat.game?.date,
+              netRating: stat.net_rating,
+              rawStat: stat
+            });
+            return {
+              game_id: stat.game?.id,
+              net_rating: Number(stat.net_rating),
+              date: stat.game?.date
+            };
+          });
 
-        const playoffNetRatings = playoffStats
-          .filter(stat => stat.net_rating !== null && stat.net_rating !== undefined)
-          .map(stat => stat.net_rating);
+        playoffNetRatings = playoffStats
+          .filter(stat => {
+            // Only check if net rating exists
+            console.log('Filtering playoff stat:', {
+              gameId: stat.game?.id,
+              date: stat.game?.date,
+              netRating: stat.net_rating,
+              rawStat: stat
+            });
+            return stat.net_rating !== null && 
+                   stat.net_rating !== undefined;
+          })
+          .map(stat => {
+            console.log('Mapping playoff stat:', {
+              gameId: stat.game?.id,
+              date: stat.game?.date,
+              netRating: stat.net_rating,
+              rawStat: stat
+            });
+            return {
+              game_id: stat.game?.id,
+              net_rating: Number(stat.net_rating),
+              date: stat.game?.date
+            };
+          });
 
         console.log('Net rating arrays:', {
           regularNetRatings,
           playoffNetRatings,
           regularCount: regularNetRatings.length,
-          playoffCount: playoffNetRatings.length
+          playoffCount: playoffNetRatings.length,
+          sampleRegularRating: regularNetRatings[0],
+          samplePlayoffRating: playoffNetRatings[0],
+          rawAdvancedStats: advancedStats.data[0]
         });
 
         // Calculate averages
         regularNetRating = regularNetRatings.length > 0 
-          ? regularNetRatings.reduce((sum, rating) => sum + rating, 0) / regularNetRatings.length 
-          : null;
+          ? regularNetRatings.reduce((sum, rating) => sum + rating.net_rating, 0) / regularNetRatings.length 
+          : 0;
 
         playoffNetRating = playoffNetRatings.length > 0
-          ? playoffNetRatings.reduce((sum, rating) => sum + rating, 0) / playoffNetRatings.length
-          : null;
+          ? playoffNetRatings.reduce((sum, rating) => sum + rating.net_rating, 0) / playoffNetRatings.length
+          : 0;
 
         console.log('Calculated net ratings:', {
           regularNetRating,
@@ -293,6 +343,57 @@ export default async function handler(req, res) {
           ? (homeScore > visitorScore ? 'W' : 'L')
           : (visitorScore > homeScore ? 'W' : 'L');
         
+        // Find the matching NET rating by game ID and date
+        const netRating = (() => {
+          const ratings = game.game.postseason ? playoffNetRatings : regularNetRatings;
+          const matchingRating = ratings.find(r => {
+            const ratingDate = new Date(r.date);
+            const gameDate = new Date(game.game.date);
+            const sameDay = ratingDate.toDateString() === gameDate.toDateString();
+            
+            console.log('Matching NET rating for game:', {
+              gameDate: game.game.date,
+              ratingDate: r.date,
+              gameMinutes: game.min,
+              gameId: game.game.id,
+              ratingGameId: r.game_id,
+              sameDay,
+              netRating: r.net_rating,
+              availableRatings: ratings.map(r => ({
+                date: r.date,
+                netRating: r.net_rating,
+                gameId: r.game_id
+              }))
+            });
+            
+            // Only match by date since game IDs might not match between APIs
+            return sameDay;
+          });
+          
+          if (!matchingRating) {
+            console.log('No matching NET rating found for game:', {
+              gameDate: game.game.date,
+              gameId: game.game.id,
+              minutes: game.min,
+              isPlayoff: game.game.postseason,
+              availableRatings: ratings.map(r => ({
+                date: r.date,
+                netRating: r.net_rating,
+                gameId: r.game_id
+              }))
+            });
+          }
+
+          const rating = matchingRating?.net_rating ?? 0;
+          console.log('Final NET rating for game:', {
+            gameDate: game.game.date,
+            gameId: game.game.id,
+            rating,
+            matchingRating
+          });
+          return rating;
+        })();
+
         return {
           date: game.game.date,
           opponent: game.game.home_team_id === game.team.id ? game.game.visitor_team_id : game.game.home_team_id,
@@ -303,7 +404,8 @@ export default async function handler(req, res) {
           result,
           score: `${homeScore}-${visitorScore}`,
           isPlayoff,
-          gameType: isPlayoff ? 'Playoff' : 'Regular Season'
+          gameType: isPlayoff ? 'Playoff' : 'Regular Season',
+          net_rating: netRating
         };
       });
 
@@ -334,6 +436,7 @@ export default async function handler(req, res) {
         playoff_net_rating: playoffNetRating ?? 0,
         regular_averages: regularAverages ?? { points: 0, rebounds: 0, assists: 0, games_played: 0 },
         playoff_averages: playoffAverages ?? { points: 0, rebounds: 0, assists: 0, games_played: 0 },
+        regularNetRatings: regularNetRatings || [],
         recent_games: recentGames.map(game => {
           const homeScore = game.game.home_team_score ?? 0;
           const visitorScore = game.game.visitor_team_score ?? 0;
@@ -342,26 +445,56 @@ export default async function handler(req, res) {
             ? (homeScore > visitorScore ? 'W' : 'L')
             : (visitorScore > homeScore ? 'W' : 'L');
 
-          // Find the corresponding advanced stats for this game
-          const gameAdvancedStats = advancedStats?.data?.find(stat => {
-            // Match by game date and player ID
-            const statDate = new Date(stat.game?.date);
-            const gameDate = new Date(game.game.date);
-            // Compare dates by year, month, and day only
-            return statDate.getFullYear() === gameDate.getFullYear() &&
-                   statDate.getMonth() === gameDate.getMonth() &&
-                   statDate.getDate() === gameDate.getDate() &&
-                   stat.player_id === parseInt(id);
-          });
+          // Find the matching NET rating by game ID and date
+          const netRating = (() => {
+            const ratings = game.game.postseason ? playoffNetRatings : regularNetRatings;
+            const matchingRating = ratings.find(r => {
+              const ratingDate = new Date(r.date);
+              const gameDate = new Date(game.game.date);
+              const sameDay = ratingDate.toDateString() === gameDate.toDateString();
+              
+              console.log('Matching NET rating for game:', {
+                gameDate: game.game.date,
+                ratingDate: r.date,
+                gameMinutes: game.min,
+                gameId: game.game.id,
+                ratingGameId: r.game_id,
+                sameDay,
+                netRating: r.net_rating,
+                availableRatings: ratings.map(r => ({
+                  date: r.date,
+                  netRating: r.net_rating,
+                  gameId: r.game_id
+                }))
+              });
+              
+              // Only match by date since game IDs might not match between APIs
+              return sameDay;
+            });
+            
+            if (!matchingRating) {
+              console.log('No matching NET rating found for game:', {
+                gameDate: game.game.date,
+                gameId: game.game.id,
+                minutes: game.min,
+                isPlayoff: game.game.postseason,
+                availableRatings: ratings.map(r => ({
+                  date: r.date,
+                  netRating: r.net_rating,
+                  gameId: r.game_id
+                }))
+              });
+            }
 
-          console.log('Matching advanced stats:', {
-            gameDate: game.game.date,
-            statDate: gameAdvancedStats?.game?.date,
-            playerId: id,
-            statPlayerId: gameAdvancedStats?.player_id,
-            netRating: gameAdvancedStats?.net_rating,
-            matched: !!gameAdvancedStats
-          });
+            const rating = matchingRating?.net_rating ?? 0;
+            console.log('Final NET rating for game:', {
+              gameDate: game.game.date,
+              gameId: game.game.id,
+              rating,
+              matchingRating
+            });
+            return rating;
+          })();
 
           return {
             date: game.game.date,
@@ -373,7 +506,7 @@ export default async function handler(req, res) {
             rebounds: game.reb || 0,
             assists: game.ast || 0,
             minutes: game.min || '0',
-            net_rating: gameAdvancedStats?.net_rating ?? 0
+            net_rating: netRating
           };
         }) || []
       }
@@ -386,7 +519,9 @@ export default async function handler(req, res) {
       playoffNetRating: response.player.playoff_net_rating,
       recentGamesCount: response.player.recent_games.length,
       hasRegularAverages: !!response.player.regular_averages,
-      hasPlayoffAverages: !!response.player.playoff_averages
+      hasPlayoffAverages: !!response.player.playoff_averages,
+      regularNetRatingsCount: response.player.regularNetRatings.length,
+      regularNetRatings: response.player.regularNetRatings
     });
 
     return res.status(200).json(response);
